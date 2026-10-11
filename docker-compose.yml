@@ -1,0 +1,60 @@
+version: '3.7'
+
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin  # Default admin user
+      - GF_SECURITY_ADMIN_PASSWORD=admin  # Default admin password
+    depends_on:
+      - timescaledb
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - metrics_network
+
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg14
+    container_name: timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: password  # Database password
+      POSTGRES_USER: postgres  # Database username
+      POSTGRES_DB: metrics  # Default database
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    networks:
+      - metrics_network
+
+  poller:
+    image: python:3.9-slim  # Lightweight Python image
+    container_name: poller
+    depends_on:
+      - timescaledb
+    volumes:
+      - ./poller:/app  # Mount the script folder to container
+    working_dir: /app
+    command: [ "sh", "-c", "pip install -r requirements.txt && python poller.py" ]
+    # Run the script
+    environment:
+      - DB_HOST=timescaledb  # TimescaleDB service hostname
+      - DB_PORT=5432  # TimescaleDB port
+      - DB_USER=postgres  # TimescaleDB username
+      - DB_PASSWORD=password  # TimescaleDB password
+      - DB_NAME=metrics  # TimescaleDB database
+      - ENDPOINT=http://blazeguard.local/stream  # Target endpoint
+    networks:
+        - metrics_network
+
+networks:
+    metrics_network:
+      driver: bridge
+
+volumes:
+  grafana_data:
+  timescaledb_data:
