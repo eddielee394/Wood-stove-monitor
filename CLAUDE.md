@@ -91,11 +91,15 @@ Pin order is per datasheet; Eddie will verify +5V/GND with a multimeter before w
   its own pins (38–41). Do not share the FSPI bus between SD and the thermocouples.
 
 ### Buzzer
-- Small magnetic buzzer already mounted inside the display case, wired between the
-  +5V end of the header and GPIO21 (per wire positions observed).
-- **Active vs passive is unknown.** Early task: test both (drive GPIO21 steady, then
-  with an LEDC tone ~2–4kHz) and ask Eddie which produces a proper beep. If using
-  LEDC, pick a channel/timer that does not collide with the backlight PWM.
+- Small magnetic buzzer already mounted inside the display case on GPIO21.
+- **Verified in Phase 1:** it is an **active** buzzer that sounds when GPIO21 is
+  driven **HIGH** (LOW is silent), so there is a driver between the pin and the
+  coil; the earlier note about it being wired straight from +5V to GPIO21 was
+  wrong. It also reproduces LEDC tones cleanly and is loudest around 2.5–3.5kHz.
+- Driver: `src/buzzer.{h,cpp}`, LEDC channel 0 (timer 0; backlight uses channel 7 /
+  timer 3), patterns stepped by an esp_timer so calls never block. Patterns
+  approved by Eddie: Warning = three 2.7kHz beeps + 1s pause; Critical = rapid
+  continuous 2.7kHz beeps; Fault = long 2.2kHz beeps; Chirp = single short beep.
 - Future option: a small 8Ω speaker on the SPK connector via the I2S amp for louder,
   multi-tone alarms.
 
@@ -296,7 +300,6 @@ After sufficient logged data.
 ## 10. Open questions for Eddie
 
 Ask these when the relevant phase begins, not all at once:
-- Buzzer: does steady drive or a tone produce the proper beep? (Phase 1)
 - Alarm threshold values for stove and flue, and rate-of-rise limit. (Phase 3)
 - The "ideal flue" rule and range. (Phase 4)
 - °F or °C default, preferred screen brightness, night dimming schedule. (Phase 4)

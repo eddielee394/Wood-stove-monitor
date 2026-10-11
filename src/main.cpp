@@ -1,9 +1,11 @@
-// Stove monitor - step 1: display + touch test for the WT32-SC01 Plus
-// Draws a test screen, shows touch coordinates, and paints where you touch.
+// Stove monitor - Phase 1: buzzer driver on the WT32-SC01 Plus
+// Touch buttons play the buzzer driver's alarm patterns for tuning by ear.
 
 #define LGFX_USE_V1
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
+
+#include "buzzer.h"
 
 // ---------------------------------------------------------------------------
 // Display configuration (pins from the WT32-SC01 Plus datasheet)
@@ -82,94 +84,90 @@ public:
 
 static LGFX tft;
 
-// "Clear" button area (top-right corner, landscape)
-static const int BTN_X = 380, BTN_Y = 0, BTN_W = 100, BTN_H = 40;
-// "Invert" toggle button, left of CLEAR - for colour diagnosis
-static const int INV_X = 270, INV_W = 100;
-static bool inverted = true;  // matches cfg.invert above
+// ---------------------------------------------------------------------------
+// Phase 1 buzzer pattern demo. Tap a pattern to start it; repeating patterns
+// keep going until STOP or another pattern is tapped.
+// ---------------------------------------------------------------------------
+struct Button { const char* label; buzzer::Pattern pattern; };
 
-void drawTestScreen() {
-  tft.fillScreen(TFT_BLACK);
+static const Button buttons[] = {
+    {"Chirp",    buzzer::Pattern::Chirp},
+    {"Warning",  buzzer::Pattern::Warning},
+    {"Critical", buzzer::Pattern::Critical},
+    {"Fault",    buzzer::Pattern::Fault},
+    {"STOP",     buzzer::Pattern::None},
+};
+static const int N_BUTTONS = sizeof(buttons) / sizeof(buttons[0]);
+static const int BTN_W = 150, BTN_H = 100, BTN_GAP = 10, BTN_TOP = 80;
 
-  // Numbered colour bars - expected colour printed under each one
-  struct Bar { uint16_t c; const char* name; };
-  const Bar bars[] = {
-      {TFT_RED, "RED"},     {TFT_GREEN, "GREEN"}, {TFT_BLUE, "BLUE"},
-      {TFT_WHITE, "WHITE"}, {TFT_YELLOW, "YELLOW"}, {0x8410, "GREY"},
-  };
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  for (int i = 0; i < 6; i++) {
-    tft.fillRect(i * 80 + 4, 200, 72, 70, bars[i].c);
-    tft.setCursor(i * 80 + 8, 276);
-    tft.printf("%d %s", i + 1, bars[i].name);
+static void buttonRect(int i, int& x, int& y) {
+  x = BTN_GAP + (i % 3) * (BTN_W + BTN_GAP);
+  y = BTN_TOP + (i / 3) * (BTN_H + BTN_GAP);
+}
+
+static void drawButtons() {
+  buzzer::Pattern now = buzzer::current();
+  for (int i = 0; i < N_BUTTONS; i++) {
+    int x, y;
+    buttonRect(i, x, y);
+    bool active = buttons[i].pattern != buzzer::Pattern::None &&
+                  buttons[i].pattern == now;
+    uint16_t colour = buttons[i].pattern == buzzer::Pattern::None ? TFT_RED
+                      : active ? TFT_ORANGE : TFT_DARKGREY;
+    tft.fillRoundRect(x, y, BTN_W, BTN_H, 10, colour);
+    tft.setTextColor(TFT_WHITE, colour);
+    tft.setTextSize(2);
+    tft.setCursor(x + 14, y + BTN_H / 2 - 8);
+    tft.print(buttons[i].label);
   }
-  tft.setCursor(10, 300);
-  tft.printf("invert=%s", inverted ? "ON" : "OFF");
+}
 
-  tft.fillRoundRect(INV_X, BTN_Y + 4, INV_W - 4, BTN_H - 8, 6, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
-  tft.setTextSize(2);
-  tft.setCursor(INV_X + 12, BTN_Y + 13);
-  tft.print("INVERT");
-
+static void drawScreen() {
+  tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(2);
   tft.setCursor(10, 10);
-  tft.println("Stove monitor - display test");
-
+  tft.print("Buzzer patterns");
   tft.setTextSize(1);
   tft.setCursor(10, 40);
-  tft.printf("PSRAM: %u KB   Flash: %u MB",
-             ESP.getPsramSize() / 1024, ESP.getFlashChipSize() / (1024 * 1024));
-  tft.setCursor(10, 55);
-  tft.println("Touch the screen to draw. Tap CLEAR to reset.");
-
-  tft.fillRoundRect(BTN_X, BTN_Y + 4, BTN_W - 4, BTN_H - 8, 6, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
-  tft.setTextSize(2);
-  tft.setCursor(BTN_X + 18, BTN_Y + 13);
-  tft.print("CLEAR");
+  tft.print("Tap a pattern. Orange = playing. STOP silences.");
+  drawButtons();
 }
 
 void setup() {
+  buzzer::begin();
   Serial.begin(115200);
   delay(500);
-  Serial.println("Stove monitor display test starting");
+  Serial.println("Stove monitor buzzer pattern demo starting");
 
   tft.init();
   tft.setRotation(1);       // landscape, 480x320
   tft.setBrightness(200);   // 0-255
-  drawTestScreen();
-
-  Serial.printf("Screen: %dx%d  PSRAM: %u bytes\n",
-                tft.width(), tft.height(), ESP.getPsramSize());
+  drawScreen();
 }
 
 void loop() {
-  int32_t x, y;
-  if (tft.getTouch(&x, &y)) {
-    if (x >= BTN_X && y < BTN_Y + BTN_H) {
-      drawTestScreen();
-      delay(250);  // simple debounce
-      return;
-    }
-    if (x >= INV_X && x < INV_X + INV_W && y < BTN_Y + BTN_H) {
-      inverted = !inverted;
-      tft.invertDisplay(inverted);
-      Serial.printf("invert=%d\n", inverted);
-      drawTestScreen();
-      delay(400);
-      return;
-    }
-    tft.fillCircle(x, y, 4, TFT_ORANGE);
+  static buzzer::Pattern shown = buzzer::Pattern::None;
 
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.setCursor(10, 180);
-    tft.printf("Touch: x=%3d y=%3d   ", x, y);
+  int32_t tx, ty;
+  if (tft.getTouch(&tx, &ty)) {
+    for (int i = 0; i < N_BUTTONS; i++) {
+      int x, y;
+      buttonRect(i, x, y);
+      if (tx >= x && tx < x + BTN_W && ty >= y && ty < y + BTN_H) {
+        Serial.printf("Pattern: %s\n", buttons[i].label);
+        buzzer::play(buttons[i].pattern);
+        delay(300);  // ignore the finger still on the glass
+        break;
+      }
+    }
+  }
 
-    Serial.printf("Touch x=%d y=%d\n", x, y);
+  // Redraw when a pattern starts or ends (Chirp ends by itself)
+  buzzer::Pattern now = buzzer::current();
+  if (now != shown) {
+    shown = now;
+    drawButtons();
   }
   delay(10);
 }
