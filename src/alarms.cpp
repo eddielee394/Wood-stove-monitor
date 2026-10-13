@@ -27,6 +27,28 @@ Level tempLevel(Level prev, float t, float warn, float crit, float hyst) {
   return Level::None;
 }
 
+// One bit per alarm condition, so a silence acknowledges exactly the
+// conditions active at that moment.
+enum : uint16_t {
+  C_WARN = 1 << 0,    // + probe index
+  C_CRIT = 1 << 2,    // + probe index
+  C_FAULT = 1 << 4,   // + probe index
+  C_RATE = 1 << 6,
+  C_RELOAD = 1 << 7,
+};
+
+uint16_t conditions(const state::Alarms& a) {
+  uint16_t m = 0;
+  for (int i = 0; i < thermo::COUNT; i++) {
+    if (a.temp[i] >= Level::Warning) m |= C_WARN << i;  // critical keeps its warning bit
+    if (a.temp[i] == Level::Critical) m |= C_CRIT << i;
+    if (a.fault[i]) m |= C_FAULT << i;
+  }
+  if (a.rateHigh) m |= C_RATE;
+  if (a.reload) m |= C_RELOAD;
+  return m;
+}
+
 buzzer::Pattern patternFor(Level l) {
   switch (l) {
     case Level::Critical: return buzzer::Pattern::Critical;
@@ -43,8 +65,9 @@ void task(void*) {
   state::Alarms a = {};
   bool reloadArmed = false;
   uint32_t reloadSince = 0;
-  Level silencedLevel = Level::None;
+  uint16_t acked = 0;  // conditions covered by the current silence
   uint32_t silencedAt = 0;
+  uint32_t silenceMs = 0;
 
   for (;;) {
     state::Snapshot snap = state::get();
@@ -95,6 +118,8 @@ void task(void*) {
                 flueT >= s.idealExitF - d;
     }
 
+    a.reloadArmed = reloadArmed;
+
     Level highest = Level::None;
     auto raise = [&](Level l) { if (l > highest) highest = l; };
     for (int i = 0; i < thermo::COUNT; i++) {
@@ -107,27 +132,39 @@ void task(void*) {
     if (state::takeSilenceRequest()) {
       if (a.reload) {
         a.reload = false;
-        reloadArmed = false;
+        reloadArmed = a.reloadArmed = false;
         if (highest == Level::Reload) highest = Level::None;
       }
       if (highest != Level::None) {
         a.silenced = true;
-        silencedLevel = highest;
+        acked = conditions(a);
         silencedAt = now;
+        // Critical (incl. chimney fire) gets a short silence; the rest longer.
+        uint32_t min = highest == Level::Critical ? s.silenceCritMin : s.silenceMin;
+        silenceMs = min * 60000;
       }
     }
     if (a.silenced) {
-      // Track improvements so a later worsening re-arms the alarm.
-      if (highest < silencedLevel) silencedLevel = highest;
-      if (highest == Level::None || highest > silencedLevel ||
-          now - silencedAt >= (uint32_t)s.silenceMin * 60000) {
+      // A condition that clears drops out of the acknowledgement, so if it
+      // comes back it counts as new. Any new condition - a worsening, the
+      // other probe, a fault, a reload - re-arms immediately, as does the
+      // timeout.
+      uint16_t active = conditions(a);
+      acked &= active;
+      if (active == 0 || (active & ~acked) || now - silencedAt >= silenceMs) {
         a.silenced = false;
       }
     }
+    a.silenceLeftS = a.silenced ? (silenceMs - (now - silencedAt) + 999) / 1000 : 0;
     a.highest = highest;
 
     buzzer::Pattern p = a.silenced ? buzzer::Pattern::None : patternFor(highest);
     if (p == buzzer::Pattern::Reload && now - reloadSince >= RELOAD_AUDIBLE_MS) {
+      p = buzzer::Pattern::None;
+    }
+    // Quiet mode mutes only the non-urgent patterns; Critical and Fault
+    // always sound.
+    if (s.quiet && (p == buzzer::Pattern::Warning || p == buzzer::Pattern::Reload)) {
       p = buzzer::Pattern::None;
     }
     if (p == buzzer::Pattern::Fault && state::benchMuteFaults()) p = buzzer::Pattern::None;

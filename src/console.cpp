@@ -23,8 +23,8 @@ void show() {
                   c.faulted ? "YES" : "no", c.fault, c.present,
                   state::levelName(s.alarms.temp[i]), s.alarms.fault[i] ? " +FAULT" : "");
   }
-  Serial.printf("ideal=%d rate_high=%d reload=%d highest=%s silenced=%d audible=%d sensor_age=%lums\n",
-                s.alarms.ideal, s.alarms.rateHigh, s.alarms.reload,
+  Serial.printf("ideal=%d rate_high=%d reload=%d armed=%d highest=%s silenced=%d audible=%d sensor_age=%lums\n",
+                s.alarms.ideal, s.alarms.rateHigh, s.alarms.reload, s.alarms.reloadArmed,
                 state::levelName(s.alarms.highest),
                 s.alarms.silenced, s.alarms.audible,
                 s.sensorMs ? (unsigned long)(millis() - s.sensorMs) : 0UL);
@@ -59,7 +59,7 @@ void run(char* line) {
     char* arg = strtok(nullptr, " ");
     bool on = arg && !strcmp(arg, "on");
     state::setBenchMuteFaults(on);
-    println(on ? "ok: bench mode ON - probe faults silent until reboot"
+    println(on ? "ok: bench mode ON - probe faults silent, fault strip hidden, until reboot"
                : "ok: bench mode off - probe faults sound");
   } else if (!strcmp(cmd, "buzzer")) {
     buzzer::debug();

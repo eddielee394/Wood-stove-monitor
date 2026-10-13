@@ -4,6 +4,7 @@
 #include <esp_heap_caps.h>
 #include <lvgl.h>
 
+#include "alarm_screens.h"
 #include "dashboard.h"
 #include "display.h"
 #include "settings.h"
@@ -19,6 +20,7 @@ const uint32_t UPDATE_MS = 250;
 
 lv_display_t* disp;
 lv_obj_t* dashScreen;
+lv_obj_t* shown;
 int brightness = -1;
 
 void flush(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
@@ -53,7 +55,38 @@ void refresh() {
   state::Snapshot s = state::get();
   settings::Settings cfg = settings::get();
   if (cfg.brightness != brightness) tft.setBrightness(brightness = cfg.brightness);
-  dashboard::update(s, cfg);
+  // Pick the screen: an unsilenced temperature alarm takes over the whole
+  // display; everything else (faults, reload, silenced alarms) stays on the
+  // dashboard with its own strip, banner or chip.
+  using alarm_screens::Kind;
+  const state::Alarms& a = s.alarms;
+  lv_obj_t* want = dashScreen;
+  if (!a.silenced) {
+    int probe = -1;
+    Kind kind = Kind::Warning;
+    if (a.rateHigh) {
+      kind = Kind::ChimneyFire;
+      probe = thermo::FLUE;
+    } else {
+      for (state::Level lvl : {state::Level::Critical, state::Level::Warning}) {
+        for (int i = thermo::COUNT - 1; i >= 0 && probe < 0; i--) {
+          if (a.temp[i] == lvl) {
+            probe = i;
+            kind = lvl == state::Level::Critical ? Kind::Critical : Kind::Warning;
+          }
+        }
+      }
+    }
+    if (probe >= 0) {
+      alarm_screens::update(kind, probe, s, cfg);
+      want = alarm_screens::screen(kind);
+    }
+  }
+  if (want == dashScreen) dashboard::update(s, cfg);
+  if (want != shown) {
+    shown = want;
+    lv_screen_load(want);
+  }
 }
 
 }  // namespace
@@ -75,12 +108,8 @@ void begin() {
   lv_indev_set_read_cb(touch, readTouch);
 
   dashScreen = dashboard::create(openSettings);
-  // Interim until the alarm screens land: any tap on the dashboard silences.
-  lv_obj_add_flag(dashScreen, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(
-      dashScreen, [](lv_event_t*) { state::requestSilence(); }, LV_EVENT_CLICKED, nullptr);
+  alarm_screens::create();
   refresh();
-  lv_screen_load(dashScreen);
 }
 
 void loop() {

@@ -31,6 +31,13 @@ struct {
   lv_obj_t* freshLabel;
   lv_obj_t* faultChip;
   lv_obj_t* faultChipLabel;
+  lv_obj_t* silencedChip;
+  lv_obj_t* silencedLabel;
+  lv_obj_t* faultStrip;      // artboard 3: probe fault with Silence button
+  lv_obj_t* faultStripTitle;
+  lv_obj_t* faultStripBtn;
+  lv_obj_t* reloadBanner;    // artboard 2: "Time to reload"
+  lv_obj_t* reloadText;
   Column col[thermo::COUNT];
   lv_obj_t* zoneStatus[5];  // ideal, chimney cool, too cool, hot, unavailable
   lv_obj_t* zoneBar;
@@ -64,6 +71,10 @@ void buildTopBar(lv_obj_t* scr) {
   ui.faultChip = row(left, 6);
   icon(ui.faultChip, &icon_warning_20, AMBER);
   ui.faultChipLabel = label(ui.faultChip, &jakarta_14_xb, AMBER, "");
+
+  ui.silencedChip = row(left, 6);
+  icon(ui.silencedChip, &icon_silence_22, AMBER);
+  ui.silencedLabel = label(ui.silencedChip, &jakarta_14_xb, AMBER, "");
 
   // Settings button (History arrives in Phase 7).
   lv_obj_t* btn = box(bar);
@@ -206,6 +217,71 @@ void buildZone(lv_obj_t* scr) {
   lv_obj_set_style_border_color(stem, c(BG), 0);
 }
 
+lv_obj_t* pillButton(lv_obj_t* parent, int w, int h, uint32_t bg, uint32_t fg, uint32_t border,
+                     const lv_image_dsc_t* ic, const char* text, lv_obj_t** labelOut) {
+  lv_obj_t* b = box(parent);
+  lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_size(b, w, h);
+  lv_obj_set_style_radius(b, 42, 0);
+  lv_obj_set_style_bg_color(b, c(bg), 0);
+  lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+  lv_obj_set_style_bg_opa(b, LV_OPA_70, LV_STATE_PRESSED);
+  if (border) {
+    lv_obj_set_style_border_width(b, 2, 0);
+    lv_obj_set_style_border_color(b, c(border), 0);
+  }
+  lv_obj_t* r = row(b, 8);
+  lv_obj_center(r);
+  if (ic) icon(r, ic, fg);
+  lv_obj_t* l = label(r, &jakarta_20_xb, fg, text);
+  if (labelOut) *labelOut = l;
+  lv_obj_add_event_cb(
+      b, [](lv_event_t*) { state::requestSilence(); }, LV_EVENT_CLICKED, nullptr);
+  return b;
+}
+
+// Bottom-panel overlays that replace the burn zone while they apply.
+void buildOverlays(lv_obj_t* scr) {
+  ui.faultStrip = box(scr);
+  lv_obj_set_pos(ui.faultStrip, 0, ZONE_Y);
+  lv_obj_set_size(ui.faultStrip, W, 320 - ZONE_Y);
+  lv_obj_set_style_bg_color(ui.faultStrip, c(BG), 0);
+  lv_obj_set_style_bg_opa(ui.faultStrip, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_side(ui.faultStrip, LV_BORDER_SIDE_TOP, 0);
+  lv_obj_set_style_border_width(ui.faultStrip, 1, 0);
+  lv_obj_set_style_border_color(ui.faultStrip, c(BORDER), 0);
+  lv_obj_t* words = box(ui.faultStrip);
+  lv_obj_set_size(words, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(words, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(words, 2, 0);
+  lv_obj_align(words, LV_ALIGN_LEFT_MID, ZONE_PAD, 0);
+  lv_obj_t* t = label(words, &jakarta_14_xb, MUTED, "PROBE FAULT");
+  lv_obj_set_style_text_letter_space(t, 1, 0);
+  ui.faultStripTitle = label(words, &jakarta_20_xb, AMBER, "");
+  label(words, &jakarta_14_sb, SUBTLE, "No temperature shown");
+  lv_obj_t* fb = pillButton(ui.faultStrip, 200, 56, 0x231A0A, AMBER, AMBER, &icon_silence_22,
+                            "Silence", &ui.faultStripBtn);
+  lv_obj_align(fb, LV_ALIGN_RIGHT_MID, -ZONE_PAD, 0);
+
+  ui.reloadBanner = box(scr);
+  lv_obj_set_pos(ui.reloadBanner, 0, 320 - 96);
+  lv_obj_set_size(ui.reloadBanner, W, 96);
+  lv_obj_set_style_bg_color(ui.reloadBanner, c(RELOAD_BG), 0);
+  lv_obj_set_style_bg_opa(ui.reloadBanner, LV_OPA_COVER, 0);
+  lv_obj_t* ri = icon(ui.reloadBanner, &icon_reload_32, RELOAD_FG);
+  lv_obj_align(ri, LV_ALIGN_LEFT_MID, ZONE_PAD, 0);
+  lv_obj_t* rw = box(ui.reloadBanner);
+  lv_obj_set_size(rw, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(rw, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(rw, 2, 0);
+  lv_obj_align(rw, LV_ALIGN_LEFT_MID, ZONE_PAD + 44, 0);
+  label(rw, &jakarta_20_xb, RELOAD_FG, "Time to reload");
+  ui.reloadText = label(rw, &jakarta_14_sb, RELOAD_FG, "");
+  lv_obj_t* ok = pillButton(ui.reloadBanner, 104, 56, RELOAD_FG, RELOAD_BTN_FG, 0, nullptr, "OK",
+                            nullptr);
+  lv_obj_align(ok, LV_ALIGN_RIGHT_MID, -ZONE_PAD, 0);
+}
+
 int scaleX(float f) {
   if (f < SCALE_MIN) f = SCALE_MIN;
   if (f > SCALE_MAX) f = SCALE_MAX;
@@ -289,6 +365,7 @@ lv_obj_t* create(void (*onSettings)()) {
   buildTopBar(ui.screen);
   for (int i = 0; i < thermo::COUNT; i++) buildColumn(ui.screen, i);
   buildZone(ui.screen);
+  buildOverlays(ui.screen);
   return ui.screen;
 }
 
@@ -310,8 +387,34 @@ void update(const state::Snapshot& s, const settings::Settings& cfg) {
     lv_label_set_text(ui.faultChipLabel, "Probe faults");
   }
 
+  const state::Alarms& a = s.alarms;
+  show(ui.silencedChip, a.silenced);
+  if (a.silenced) {
+    lv_label_set_text_fmt(ui.silencedLabel, "Silenced %u:%02u", a.silenceLeftS / 60,
+                          a.silenceLeftS % 60);
+  }
+
   for (int i = 0; i < thermo::COUNT; i++) updateColumn(i, s.ch[i], cfg.unitsC);
   updateZone(s, cfg);
+
+  // The fault strip outranks the reload banner (same panel). Bench mode
+  // hides it; the column and top-bar chip still show the fault.
+  bool faultStrip = faults > 0 && !a.silenced && !state::benchMuteFaults();
+  show(ui.faultStrip, faultStrip);
+  if (faultStrip) {
+    lv_label_set_text(ui.faultStripTitle, faults > 1 ? "Both probes"
+                                          : which == thermo::STOVE ? "Stove probe" : "Flue probe");
+    lv_label_set_text_fmt(ui.faultStripBtn, "Silence %d min", (int)cfg.silenceMin);
+  }
+  bool reload = a.reload && !a.silenced && !faultStrip;
+  show(ui.reloadBanner, reload);
+  if (reload && s.ch[thermo::STOVE].valid) {
+    float t = s.ch[thermo::STOVE].tempF;
+    float r = s.ch[thermo::STOVE].rateFpm;
+    lv_label_set_text_fmt(ui.reloadText, "Stove is down to %d°%c%s.",
+                          (int)lroundf(toUnits(t, cfg.unitsC)), cfg.unitsC ? 'C' : 'F',
+                          (!isnan(r) && r < -1) ? " and falling" : "");
+  }
 }
 
 }  // namespace ui::dashboard
