@@ -1,11 +1,12 @@
-// Stove monitor - Phase 1: buzzer driver on the WT32-SC01 Plus
-// Touch buttons play the buzzer driver's alarm patterns for tuning by ear.
+// Stove monitor - Phase 2: thermocouple bench test on the WT32-SC01 Plus
+// Reads both MAX31856 channels once a second; shows temps and faults.
 
 #define LGFX_USE_V1
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
 
 #include "buzzer.h"
+#include "thermo.h"
 
 // ---------------------------------------------------------------------------
 // Display configuration (pins from the WT32-SC01 Plus datasheet)
@@ -85,89 +86,85 @@ public:
 static LGFX tft;
 
 // ---------------------------------------------------------------------------
-// Phase 1 buzzer pattern demo. Tap a pattern to start it; repeating patterns
-// keep going until STOP or another pattern is tapped.
+// Phase 2 thermocouple bench test: both channels on screen and serial, 1Hz.
 // ---------------------------------------------------------------------------
-struct Button { const char* label; buzzer::Pattern pattern; };
+static float toF(float c) { return c * 9.0f / 5.0f + 32.0f; }
 
-static const Button buttons[] = {
-    {"Chirp",    buzzer::Pattern::Chirp},
-    {"Warning",  buzzer::Pattern::Warning},
-    {"Critical", buzzer::Pattern::Critical},
-    {"Fault",    buzzer::Pattern::Fault},
-    {"STOP",     buzzer::Pattern::None},
-};
-static const int N_BUTTONS = sizeof(buttons) / sizeof(buttons[0]);
-static const int BTN_W = 150, BTN_H = 100, BTN_GAP = 10, BTN_TOP = 80;
+static void drawChannel(thermo::Channel ch, const thermo::Reading& r) {
+  const int x = ch * 240, w = 240, y = 40, h = 280;
+  bool ok = r.present && r.fault == 0 && !isnan(r.tcC);
+  uint16_t frame = ok ? TFT_DARKGREEN : TFT_RED;
 
-static void buttonRect(int i, int& x, int& y) {
-  x = BTN_GAP + (i % 3) * (BTN_W + BTN_GAP);
-  y = BTN_TOP + (i / 3) * (BTN_H + BTN_GAP);
-}
+  tft.fillRect(x + 4, y, w - 8, h - 4, TFT_BLACK);
+  tft.drawRoundRect(x + 4, y, w - 8, h - 4, 10, frame);
+  tft.drawRoundRect(x + 5, y + 1, w - 10, h - 6, 9, frame);
 
-static void drawButtons() {
-  buzzer::Pattern now = buzzer::current();
-  for (int i = 0; i < N_BUTTONS; i++) {
-    int x, y;
-    buttonRect(i, x, y);
-    bool active = buttons[i].pattern != buzzer::Pattern::None &&
-                  buttons[i].pattern == now;
-    uint16_t colour = buttons[i].pattern == buzzer::Pattern::None ? TFT_RED
-                      : active ? TFT_ORANGE : TFT_DARKGREY;
-    tft.fillRoundRect(x, y, BTN_W, BTN_H, 10, colour);
-    tft.setTextColor(TFT_WHITE, colour);
-    tft.setTextSize(2);
-    tft.setCursor(x + 14, y + BTN_H / 2 - 8);
-    tft.print(buttons[i].label);
-  }
-}
-
-static void drawScreen() {
-  tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(3);
+  tft.setCursor(x + 20, y + 16);
+  tft.print(thermo::name(ch));
+
+  tft.setCursor(x + 20, y + 80);
+  if (!r.present) {
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.setTextSize(3);
+    tft.print("NO CHIP");
+  } else {
+    tft.setTextColor(ok ? TFT_WHITE : TFT_RED, TFT_BLACK);
+    tft.setTextSize(5);
+    tft.printf("%.1f", toF(r.tcC));
+    tft.setTextSize(2);
+    tft.print(" F");
+  }
+
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   tft.setTextSize(2);
-  tft.setCursor(10, 10);
-  tft.print("Buzzer patterns");
-  tft.setTextSize(1);
-  tft.setCursor(10, 40);
-  tft.print("Tap a pattern. Orange = playing. STOP silences.");
-  drawButtons();
+  tft.setCursor(x + 20, y + 170);
+  if (r.present) tft.printf("Board %.1f F", toF(r.cjC));
+
+  char faults[64];
+  thermo::describeFault(r.fault, faults, sizeof(faults));
+  tft.setCursor(x + 20, y + 210);
+  tft.setTextColor(r.present && !r.fault ? TFT_GREEN : TFT_RED, TFT_BLACK);
+  tft.setTextSize(r.fault ? 1 : 2);
+  tft.print(r.present ? faults : "check wiring/CS");
 }
 
 void setup() {
-  buzzer::begin();
+  buzzer::begin();  // holds the buzzer pin quiet
   Serial.begin(115200);
   delay(500);
-  Serial.println("Stove monitor buzzer pattern demo starting");
+  Serial.println("Stove monitor thermocouple bench test starting");
 
   tft.init();
   tft.setRotation(1);       // landscape, 480x320
   tft.setBrightness(200);   // 0-255
-  drawScreen();
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(2);
+  tft.setCursor(10, 10);
+  tft.print("Thermocouple bench test");
+
+  thermo::begin();
 }
 
 void loop() {
-  static buzzer::Pattern shown = buzzer::Pattern::None;
-
-  int32_t tx, ty;
-  if (tft.getTouch(&tx, &ty)) {
-    for (int i = 0; i < N_BUTTONS; i++) {
-      int x, y;
-      buttonRect(i, x, y);
-      if (tx >= x && tx < x + BTN_W && ty >= y && ty < y + BTN_H) {
-        Serial.printf("Pattern: %s\n", buttons[i].label);
-        buzzer::play(buttons[i].pattern);
-        delay(300);  // ignore the finger still on the glass
-        break;
-      }
-    }
+  static uint32_t last = 0;
+  if (millis() - last < 1000) {
+    delay(10);
+    return;
   }
+  last = millis();
 
-  // Redraw when a pattern starts or ends (Chirp ends by itself)
-  buzzer::Pattern now = buzzer::current();
-  if (now != shown) {
-    shown = now;
-    drawButtons();
+  for (int i = 0; i < thermo::COUNT; i++) {
+    auto ch = (thermo::Channel)i;
+    thermo::Reading r = thermo::read(ch);
+    drawChannel(ch, r);
+
+    char faults[64];
+    thermo::describeFault(r.fault, faults, sizeof(faults));
+    Serial.printf("%-5s present=%d tc=%.2fC (%.1fF) cj=%.2fC fault=0x%02X %s\n",
+                  thermo::name(ch), r.present, r.tcC, toF(r.tcC), r.cjC,
+                  r.fault, faults);
   }
-  delay(10);
 }
