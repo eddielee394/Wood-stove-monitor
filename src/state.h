@@ -26,6 +26,7 @@ struct Alarms {
   bool fault[thermo::COUNT];   // probe fault or stale sensor data
   bool rateHigh;               // FLUE rate-of-rise
   bool reload;                 // STOVE cooled below the reload threshold
+  bool ideal;                  // burn is in the "ideal flue" band (info only)
   Level highest;
   bool silenced;
   bool audible;                // buzzer is currently sounding a pattern

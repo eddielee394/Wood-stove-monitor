@@ -120,6 +120,13 @@ static void drawStatus(const state::Snapshot& s) {
   snprintf(buf, sizeof(buf), "sensors %.1fs ago   up %lum", age / 1000.0f,
            (unsigned long)(millis() / 60000));
   screen.drawString(buf, 8, 300);
+
+  if (s.alarms.ideal) {
+    screen.fillRoundRect(352, 294, 124, 24, 12, TFT_DARKGREEN);
+    screen.setTextColor(TFT_WHITE, TFT_DARKGREEN);
+    screen.setTextDatum(middle_center);
+    screen.drawString("IDEAL BURN", 414, 306);
+  }
 }
 
 static void drawScreen() {

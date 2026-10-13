@@ -16,6 +16,7 @@ const uint32_t PERIOD_MS = 250;
 const uint32_t STALE_MS = 5000;           // sensor data older than this = fault
 const uint32_t RELOAD_AUDIBLE_MS = 5 * 60000;  // then visual only
 const float RATE_HYST_FRACTION = 0.2f;  // clears 20% below the limit
+const float IDEAL_DEADBAND_F = 10;      // keeps the indicator from flickering
 
 // Warning/critical with hysteresis: a level holds until the temperature
 // falls hyst below the threshold that raised it.
@@ -82,6 +83,16 @@ void task(void*) {
         a.reload = true;
         reloadSince = now;
       }
+    }
+
+    // Ideal-burn indicator: informational only, never raises an alarm.
+    float flueT = snap.ch[thermo::FLUE].tempF;
+    if (!s.idealOn || stale || isnan(stove) || isnan(flueT)) {
+      a.ideal = false;
+    } else {
+      float d = a.ideal ? IDEAL_DEADBAND_F : 0;
+      a.ideal = stove >= s.idealLoF - d && stove <= s.idealHiF + d &&
+                flueT >= s.idealExitF - d;
     }
 
     Level highest = Level::None;

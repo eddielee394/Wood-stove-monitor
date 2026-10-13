@@ -19,6 +19,10 @@ struct Settings {
   int32_t reloadOn;     // 0/1: low "time to reload" alert on STOVE
   int32_t reloadF;
   int32_t hystF;        // hysteresis applied to every threshold
+  int32_t idealOn;      // 0/1: show the "ideal burn" indicator
+  int32_t idealLoF;     // ideal when STOVE is within lo..hi
+  int32_t idealHiF;
+  int32_t idealExitF;   // ...and FLUE (chimney exit) is at least this
   int32_t silenceMin;   // a silenced alarm re-arms after this long
   int32_t unitsC;       // 0 = deg F, 1 = deg C
   int32_t brightness;   // backlight 0-255

@@ -23,6 +23,10 @@ const Field FIELDS[] = {
     {"reload_on", &Settings::reloadOn, 0, 1},
     {"reload", &Settings::reloadF, 50, 1000},
     {"hyst", &Settings::hystF, 1, 200},
+    {"ideal_on", &Settings::idealOn, 0, 1},
+    {"ideal_lo", &Settings::idealLoF, 50, 2300},
+    {"ideal_hi", &Settings::idealHiF, 50, 2300},
+    {"ideal_exit", &Settings::idealExitF, 50, 2300},
     {"silence_min", &Settings::silenceMin, 1, 120},
     {"units_c", &Settings::unitsC, 0, 1},
     {"brightness", &Settings::brightness, 10, 255},
@@ -49,6 +53,10 @@ bool validate(const Settings& s, char* err, size_t errLen) {
     snprintf(err, errLen, "flue_warn must be below flue_crit");
     return false;
   }
+  if (s.idealLoF >= s.idealHiF) {
+    snprintf(err, errLen, "ideal_lo must be below ideal_hi");
+    return false;
+  }
   if (s.reloadF >= s.stoveWarnF) {
     snprintf(err, errLen, "reload must be below stove_warn");
     return false;
@@ -70,6 +78,13 @@ Settings defaults() {
   s.reloadOn = 1;
   s.reloadF = 300;
   s.hystF = 25;
+  // Ideal burn: catalytic cruising range at the collar (in-pipe probe
+  // guidance is 275-500F; catalytic stoves cruise ~400-550F) and a chimney
+  // exit above ~250F so water vapour and creosote don't condense.
+  s.idealOn = 1;
+  s.idealLoF = 300;
+  s.idealHiF = 550;
+  s.idealExitF = 250;
   s.silenceMin = 10;
   s.unitsC = 0;
   s.brightness = 200;

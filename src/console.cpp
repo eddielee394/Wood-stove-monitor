@@ -23,8 +23,9 @@ void show() {
                   c.faulted ? "YES" : "no", c.fault, c.present,
                   state::levelName(s.alarms.temp[i]), s.alarms.fault[i] ? " +FAULT" : "");
   }
-  Serial.printf("rate_high=%d reload=%d highest=%s silenced=%d audible=%d sensor_age=%lums\n",
-                s.alarms.rateHigh, s.alarms.reload, state::levelName(s.alarms.highest),
+  Serial.printf("ideal=%d rate_high=%d reload=%d highest=%s silenced=%d audible=%d sensor_age=%lums\n",
+                s.alarms.ideal, s.alarms.rateHigh, s.alarms.reload,
+                state::levelName(s.alarms.highest),
                 s.alarms.silenced, s.alarms.audible,
                 s.sensorMs ? (unsigned long)(millis() - s.sensorMs) : 0UL);
 }

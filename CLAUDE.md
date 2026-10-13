@@ -195,10 +195,11 @@ with backoff; the old device's main complaint was flaky Wi-Fi needing manual res
 - Hysteresis on all thresholds to prevent chattering.
 
 ### "Ideal flue" indicator
-The original device showed an icon when flue temperature was in the ideal range
-relative to the stove. Implement it as a configurable rule (e.g. flue within a
-configurable band, optionally relative to stove temperature). **Ask Eddie for the
-rule and band he wants before hard-coding defaults.**
+Informational only, never an alarm. Lit when STOVE (collar) is within
+`ideal_lo`..`ideal_hi` **and** FLUE (chimney exit) is at least `ideal_exit`, with
+a 10°F deadband. Defaults 300–550°F and ≥250°F, chosen by Claude at Eddie's
+request: in-pipe probe guidance is 275–500°F, catalytic stoves cruise ~400–550°F,
+and exit gas below ~250°F condenses water and creosote. Revisit after real burns.
 
 ### Default thresholds (confirmed with Eddie, Phase 3)
 | Setting | Default |
@@ -209,6 +210,11 @@ rule and band he wants before hard-coding defaults.**
 | Reload alert (STOVE low) | 300°F, arms after STOVE reaches reload + 2×hyst |
 | Hysteresis | 25°F (rate alarm clears 20% below its limit) |
 | Silence re-arm timeout | 10 min |
+| Ideal burn indicator | STOVE 300–550°F and FLUE ≥ 250°F |
+
+Unverified: a forum report says catalytic stoves can run ~1300°F at the collar for
+~10 min during catalyst warm-up, which would trip the STOVE 1000/1100°F alarms on
+every startup. Eddie chose these values; check them against the first real burn.
 
 Defaults live in `settings::defaults()` (`src/settings.cpp`). Change values on a
 running device with the serial console (`settings`, `set <key> <value>`,
@@ -316,6 +322,5 @@ After sufficient logged data.
 ## 10. Open questions for Eddie
 
 Ask these when the relevant phase begins, not all at once:
-- The "ideal flue" rule and range. (Phase 4)
 - °F or °C default, preferred screen brightness, night dimming schedule. (Phase 4)
 - Whether he wants SD-card history logging. (Phase 7)
