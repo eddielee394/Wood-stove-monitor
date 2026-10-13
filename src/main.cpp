@@ -1,170 +1,181 @@
-// Stove monitor - Phase 2: thermocouple bench test on the WT32-SC01 Plus
-// Reads both MAX31856 channels once a second; shows temps and faults.
+// Stove monitor - WT32-SC01 Plus
+// Phase 3: core firmware. Sensor and alarm tasks run independently of this
+// loop, which only draws an interim status screen (LVGL arrives in Phase 4)
+// and services the serial console.
 
-#define LGFX_USE_V1
 #include <Arduino.h>
-#include <LovyanGFX.hpp>
+#include <esp_task_wdt.h>
 
+#include "alarms.h"
 #include "buzzer.h"
-#include "thermo.h"
+#include "console.h"
+#include "display.h"
+#include "sensors.h"
+#include "settings.h"
+#include "state.h"
 
-// ---------------------------------------------------------------------------
-// Display configuration (pins from the WT32-SC01 Plus datasheet)
-// ST7796 panel on an 8-bit parallel bus, FT6336 touch (FT5x06 family)
-// ---------------------------------------------------------------------------
-class LGFX : public lgfx::LGFX_Device {
-  lgfx::Panel_ST7796  _panel;
-  lgfx::Bus_Parallel8 _bus;
-  lgfx::Light_PWM     _light;
-  lgfx::Touch_FT5x06  _touch;
+LGFX tft;
+static LGFX_Sprite screen(&tft);  // full-frame buffer in PSRAM, no flicker
 
-public:
-  LGFX() {
-    {  // Parallel bus
-      auto cfg = _bus.config();
-      cfg.freq_write = 20000000;
-      cfg.pin_wr = 47;
-      cfg.pin_rd = -1;
-      cfg.pin_rs = 0;   // command/data select
-      cfg.pin_d0 = 9;
-      cfg.pin_d1 = 46;
-      cfg.pin_d2 = 3;
-      cfg.pin_d3 = 8;
-      cfg.pin_d4 = 18;
-      cfg.pin_d5 = 17;
-      cfg.pin_d6 = 16;
-      cfg.pin_d7 = 15;
-      _bus.config(cfg);
-      _panel.setBus(&_bus);
-    }
-    {  // Panel
-      auto cfg = _panel.config();
-      cfg.pin_cs = -1;
-      cfg.pin_rst = 4;  // shared with touch reset
-      cfg.pin_busy = -1;
-      cfg.panel_width = 320;
-      cfg.panel_height = 480;
-      cfg.offset_x = 0;
-      cfg.offset_y = 0;
-      cfg.offset_rotation = 0;
-      cfg.readable = false;
-      cfg.invert = true;
-      cfg.rgb_order = false;
-      cfg.dlen_16bit = false;
-      cfg.bus_shared = false;
-      _panel.config(cfg);
-    }
-    {  // Backlight
-      auto cfg = _light.config();
-      cfg.pin_bl = 45;
-      cfg.invert = false;
-      cfg.freq = 44100;
-      cfg.pwm_channel = 7;
-      _light.config(cfg);
-      _panel.setLight(&_light);
-    }
-    {  // Touch
-      auto cfg = _touch.config();
-      cfg.i2c_port = 1;
-      cfg.i2c_addr = 0x38;
-      cfg.pin_sda = 6;
-      cfg.pin_scl = 5;
-      cfg.pin_int = 7;
-      cfg.pin_rst = -1;  // reset handled by the panel (GPIO4)
-      cfg.freq = 400000;
-      cfg.x_min = 0;
-      cfg.x_max = 319;
-      cfg.y_min = 0;
-      cfg.y_max = 479;
-      _touch.config(cfg);
-      _panel.setTouch(&_touch);
-    }
-    setPanel(&_panel);
+static const uint32_t WDT_TIMEOUT_S = 10;
+static const uint32_t UI_PERIOD_MS = 250;
+
+using state::Level;
+
+static uint16_t levelColour(Level l) {
+  switch (l) {
+    case Level::Critical: return TFT_RED;
+    case Level::Fault: return TFT_MAGENTA;
+    case Level::Warning: return TFT_ORANGE;
+    case Level::Reload: return TFT_BLUE;
+    default: return TFT_DARKGREEN;
   }
-};
+}
 
-static LGFX tft;
+static float display(float f, bool c) { return c ? (f - 32.0f) * 5.0f / 9.0f : f; }
 
-// ---------------------------------------------------------------------------
-// Phase 2 thermocouple bench test: both channels on screen and serial, 1Hz.
-// ---------------------------------------------------------------------------
-static float toF(float c) { return c * 9.0f / 5.0f + 32.0f; }
+static void drawBanner(const state::Snapshot& s) {
+  const state::Alarms& a = s.alarms;
+  uint16_t bg = a.highest == Level::None ? TFT_DARKGREY : levelColour(a.highest);
+  screen.fillRect(0, 0, 480, 48, bg);
+  screen.setTextColor(TFT_WHITE, bg);
+  screen.setFont(&fonts::Font4);
+  screen.setTextDatum(middle_left);
 
-static void drawChannel(thermo::Channel ch, const thermo::Reading& r) {
-  const int x = ch * 240, w = 240, y = 40, h = 280;
-  bool ok = r.present && r.fault == 0 && !isnan(r.tcC);
-  uint16_t frame = ok ? TFT_DARKGREEN : TFT_RED;
+  const char* msg = "All normal";
+  if (a.rateHigh) msg = "FLUE RISING FAST";
+  else if (a.highest == Level::Critical) msg = "CRITICAL TEMPERATURE";
+  else if (a.highest == Level::Fault) msg = "PROBE FAULT";
+  else if (a.highest == Level::Warning) msg = "HIGH TEMPERATURE";
+  else if (a.highest == Level::Reload) msg = "Time to reload";
+  screen.drawString(msg, 12, 24);
 
-  tft.fillRect(x + 4, y, w - 8, h - 4, TFT_BLACK);
-  tft.drawRoundRect(x + 4, y, w - 8, h - 4, 10, frame);
-  tft.drawRoundRect(x + 5, y + 1, w - 10, h - 6, 9, frame);
+  if (a.highest != Level::None) {
+    screen.setFont(&fonts::Font2);
+    screen.setTextDatum(middle_right);
+    screen.drawString(a.silenced ? "silenced" : "tap to silence", 470, 24);
+  }
+}
 
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(3);
-  tft.setCursor(x + 20, y + 16);
-  tft.print(thermo::name(ch));
+static void drawChannel(const state::Snapshot& s, int i, bool unitsC) {
+  const state::Channel& c = s.ch[i];
+  const int x = 4 + i * 240, y = 54, w = 232, h = 236;
+  Level lvl = s.alarms.fault[i] ? Level::Fault : s.alarms.temp[i];
+  if (i == thermo::FLUE && s.alarms.rateHigh) lvl = Level::Critical;
+  uint16_t frame = levelColour(lvl);
 
-  tft.setCursor(x + 20, y + 80);
-  if (!r.present) {
-    tft.setTextColor(TFT_RED, TFT_BLACK);
-    tft.setTextSize(3);
-    tft.print("NO CHIP");
+  screen.fillRoundRect(x, y, w, h, 10, frame);
+  screen.fillRoundRect(x + 4, y + 4, w - 8, h - 8, 8, TFT_BLACK);
+  screen.setTextColor(TFT_WHITE, TFT_BLACK);
+  screen.setTextDatum(top_left);
+  screen.setFont(&fonts::Font4);
+  screen.drawString(thermo::name((thermo::Channel)i), x + 14, y + 12);
+
+  if (!c.valid) {
+    screen.setTextColor(TFT_MAGENTA, TFT_BLACK);
+    screen.drawString(c.present ? "PROBE FAULT" : "NO SENSOR", x + 14, y + 80);
+    if (c.present && c.fault) {
+      char faults[48];
+      thermo::describeFault(c.fault, faults, sizeof(faults));
+      screen.setFont(&fonts::Font2);
+      screen.drawString(faults, x + 14, y + 115);
+    }
+    return;
+  }
+
+  char buf[24];
+  screen.setFont(&fonts::Font7);
+  screen.setTextSize(1.4f);
+  snprintf(buf, sizeof(buf), "%.0f", display(c.tempF, unitsC));
+  screen.drawString(buf, x + 14, y + 55);
+  int tw = screen.textWidth(buf);
+  screen.setTextSize(1);
+  screen.setFont(&fonts::Font4);
+  screen.drawString(unitsC ? "C" : "F", x + 20 + tw, y + 55);
+
+  // Rate of change, with an arrow once it is more than a trickle
+  screen.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  if (isnan(c.rateFpm)) {
+    screen.drawString("rate: --", x + 14, y + 140);
   } else {
-    tft.setTextColor(ok ? TFT_WHITE : TFT_RED, TFT_BLACK);
-    tft.setTextSize(5);
-    tft.printf("%.1f", toF(r.tcC));
-    tft.setTextSize(2);
-    tft.print(" F");
+    float r = unitsC ? c.rateFpm * 5.0f / 9.0f : c.rateFpm;
+    int ax = x + 24, ay = y + 152;
+    if (r >= 2) screen.fillTriangle(ax - 10, ay + 8, ax + 10, ay + 8, ax, ay - 10, TFT_ORANGE);
+    else if (r <= -2) screen.fillTriangle(ax - 10, ay - 8, ax + 10, ay - 8, ax, ay + 10, TFT_CYAN);
+    snprintf(buf, sizeof(buf), "%+.0f /min", r);
+    screen.drawString(buf, x + 44, y + 140);
   }
 
-  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  tft.setTextSize(2);
-  tft.setCursor(x + 20, y + 170);
-  if (r.present) tft.printf("Board %.1f F", toF(r.cjC));
+  screen.setFont(&fonts::Font2);
+  snprintf(buf, sizeof(buf), "board %.0f%s", display(c.boardF, unitsC), unitsC ? "C" : "F");
+  screen.drawString(buf, x + 14, y + 200);
+}
 
-  char faults[64];
-  thermo::describeFault(r.fault, faults, sizeof(faults));
-  tft.setCursor(x + 20, y + 210);
-  tft.setTextColor(r.present && !r.fault ? TFT_GREEN : TFT_RED, TFT_BLACK);
-  tft.setTextSize(r.fault ? 1 : 2);
-  tft.print(r.present ? faults : "check wiring/CS");
+static void drawStatus(const state::Snapshot& s) {
+  char buf[64];
+  uint32_t age = s.sensorMs ? millis() - s.sensorMs : 0;
+  screen.setFont(&fonts::Font2);
+  screen.setTextDatum(top_left);
+  screen.setTextColor(age > 3000 ? TFT_RED : TFT_DARKGREY, TFT_BLACK);
+  snprintf(buf, sizeof(buf), "sensors %.1fs ago   up %lum", age / 1000.0f,
+           (unsigned long)(millis() / 60000));
+  screen.drawString(buf, 8, 300);
+}
+
+static void drawScreen() {
+  state::Snapshot s = state::get();
+  bool unitsC = settings::get().unitsC;
+  screen.fillScreen(TFT_BLACK);
+  drawBanner(s);
+  for (int i = 0; i < thermo::COUNT; i++) drawChannel(s, i, unitsC);
+  drawStatus(s);
+  screen.pushSprite(0, 0);
 }
 
 void setup() {
-  buzzer::begin();  // holds the buzzer pin quiet
+  buzzer::begin();  // pin held quiet before anything else
   Serial.begin(115200);
   delay(500);
-  Serial.println("Stove monitor thermocouple bench test starting");
+  Serial.println("Stove monitor starting");
+
+  // Reboot if the sensor or alarm task stops checking in.
+  esp_task_wdt_init(WDT_TIMEOUT_S, true);
+
+  settings::begin();
+  state::begin();
+  sensors::start();
+  alarms::start();
 
   tft.init();
-  tft.setRotation(1);       // landscape, 480x320
-  tft.setBrightness(200);   // 0-255
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(2);
-  tft.setCursor(10, 10);
-  tft.print("Thermocouple bench test");
-
-  thermo::begin();
+  tft.setRotation(1);  // landscape, 480x320
+  tft.setBrightness(settings::get().brightness);
+  screen.setPsram(true);
+  screen.setColorDepth(16);
+  if (!screen.createSprite(480, 320)) Serial.println("UI: sprite allocation failed");
+  Serial.println("Type 'help' for console commands");
 }
 
 void loop() {
-  static uint32_t last = 0;
-  if (millis() - last < 1000) {
-    delay(10);
-    return;
-  }
-  last = millis();
+  static uint32_t lastDraw = 0;
+  static int brightness = -1;
+  static bool touching = false;
 
-  for (int i = 0; i < thermo::COUNT; i++) {
-    auto ch = (thermo::Channel)i;
-    thermo::Reading r = thermo::read(ch);
-    drawChannel(ch, r);
+  console::poll();
 
-    char faults[64];
-    thermo::describeFault(r.fault, faults, sizeof(faults));
-    Serial.printf("%-5s present=%d tc=%.2fC (%.1fF) cj=%.2fC fault=0x%02X %s\n",
-                  thermo::name(ch), r.present, r.tcC, toF(r.tcC), r.cjC,
-                  r.fault, faults);
+  // Any new touch acknowledges/silences the current alarm.
+  int32_t x, y;
+  bool touched = tft.getTouch(&x, &y);
+  if (touched && !touching) {
+    Serial.printf("touch x=%ld y=%ld -> silence\n", (long)x, (long)y);
+    state::requestSilence();
   }
+  touching = touched;
+
+  if (millis() - lastDraw >= UI_PERIOD_MS) {
+    lastDraw = millis();
+    int b = settings::get().brightness;
+    if (b != brightness) tft.setBrightness(brightness = b);
+    drawScreen();
+  }
+  delay(10);
 }

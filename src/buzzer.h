@@ -18,6 +18,7 @@ enum class Pattern : uint8_t {
   Warning,   // three beeps, pause, repeat
   Critical,  // rapid continuous beeping, no pause
   Fault,     // long low beeps, repeat
+  Reload,    // gentle double chirp every 20s
   Custom,    // one-off tone() in progress
 };
 
@@ -33,5 +34,7 @@ void play(Pattern p);
 void tone(uint16_t freq, uint16_t ms);
 void stop();
 Pattern current();
+// Print driver and LEDC/GPIO routing state to Serial (console 'buzzer').
+void debug();
 
 }  // namespace buzzer

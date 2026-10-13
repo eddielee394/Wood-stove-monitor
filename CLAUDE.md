@@ -82,6 +82,11 @@ Pin order is per datasheet; Eddie will verify +5V/GND with a multimeter before w
 - 2× Adafruit MAX31856 breakouts (product #3263), powered from 5V (onboard regulator
   and level shifting; logic is 3.3V-safe).
 - Mounted in a separate passive junction box, connected by a short (<1m) Cat5 run.
+- Probe placement (confirmed by Eddie): **STOVE** channel (CS GPIO10) is on the
+  flue pipe just above the stove collar; **FLUE** channel (CS GPIO14) is at the top
+  of the chimney, just outside the pipe. Double-wall pipe; Eddie verified little
+  heat loss through the wall at the probe. Stove is catalytic. Keep the
+  STOVE / FLUE labels.
 - Probes: existing installed K-type thermocouples, 1.5m leads, labeled "K1.5M".
   Polarity unverified — if a reading drops when the tip is warmed, the leads are
   swapped (hardware fix, not software).
@@ -195,10 +200,19 @@ relative to the stove. Implement it as a configurable rule (e.g. flue within a
 configurable band, optionally relative to stove temperature). **Ask Eddie for the
 rule and band he wants before hard-coding defaults.**
 
-### Default thresholds
-Use clearly marked placeholders and **confirm values with Eddie** before finalizing.
-They depend on his stove (catalytic or not), probe placement, and single- vs
-double-wall pipe.
+### Default thresholds (confirmed with Eddie, Phase 3)
+| Setting | Default |
+|---|---|
+| STOVE warning / critical | 1000°F / 1100°F |
+| FLUE warning / critical | 850°F / 950°F |
+| FLUE rate-of-rise | 150°F/min, only starts when FLUE ≥ 500°F |
+| Reload alert (STOVE low) | 300°F, arms after STOVE reaches reload + 2×hyst |
+| Hysteresis | 25°F (rate alarm clears 20% below its limit) |
+| Silence re-arm timeout | 10 min |
+
+Defaults live in `settings::defaults()` (`src/settings.cpp`). Change values on a
+running device with the serial console (`settings`, `set <key> <value>`,
+`defaults`, `show`, `silence`, `buzzer`).
 
 ### Local display (UI v1)
 - Two large readouts (stove, flue) with status colour (normal / warning / critical /
@@ -253,6 +267,8 @@ Ask Eddie to fill it in; don't ask him to paste passwords into chat.
   points are mirrored or offset, check rotation and x/y min/max.
 - PSRAM is quad, so GPIO35–37 are free for I2S (they would not be with octal PSRAM).
 - USB hubs caused enumeration failures on Eddie's Mac — plug in directly.
+- GPIO11 and GPIO14 are the native FSPID / FSPIWP pins; while the SPI peripheral
+  owns them they idle HIGH, so pin-level probing with SPI attached is misleading.
 - The board can sit near a hot stove; keep CPU load reasonable and don't run the
   backlight at 100% permanently.
 
@@ -300,7 +316,6 @@ After sufficient logged data.
 ## 10. Open questions for Eddie
 
 Ask these when the relevant phase begins, not all at once:
-- Alarm threshold values for stove and flue, and rate-of-rise limit. (Phase 3)
 - The "ideal flue" rule and range. (Phase 4)
 - °F or °C default, preferred screen brightness, night dimming schedule. (Phase 4)
 - Whether he wants SD-card history logging. (Phase 7)

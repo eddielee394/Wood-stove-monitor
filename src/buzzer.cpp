@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <esp_timer.h>
+#include <soc/gpio_reg.h>
 #include <freertos/semphr.h>
 
 namespace buzzer {
@@ -26,6 +27,7 @@ const Step WARNING[] = {{2700, 150}, {0, 100}, {2700, 150}, {0, 100},
                         {2700, 150}, {0, 1000}};
 const Step CRITICAL[] = {{2700, 100}, {0, 60}};
 const Step FAULT[] = {{2200, 600}, {0, 600}};
+const Step RELOAD[] = {{2700, 80}, {0, 120}, {2700, 80}, {0, 20000}};
 Step custom[] = {{0, 0}};  // filled by tone()
 
 struct Def {
@@ -41,6 +43,7 @@ const Def DEFS[] = {
     DEF(WARNING, true),
     DEF(CRITICAL, true),
     DEF(FAULT, true),
+    DEF(RELOAD, true),
     DEF(custom, false),
 };
 #undef DEF
@@ -133,6 +136,15 @@ Pattern current() {
   Pattern p = pattern;
   xSemaphoreGive(lock);
   return p;
+}
+
+void debug() {
+  uint32_t outSel = REG_READ(GPIO_FUNC0_OUT_SEL_CFG_REG + 4 * PIN) & 0x1FF;
+  Serial.printf("buzzer: pattern=%d step=%d ledc_freq=%lu ledc_duty=%lu "
+                "gpio%d_out_signal=%lu (LEDC ch0=%d) output_enabled=%d\n",
+                (int)pattern, step, (unsigned long)ledcReadFreq(CHANNEL),
+                (unsigned long)ledcRead(CHANNEL), PIN, (unsigned long)outSel,
+                LEDC_LS_SIG_OUT0_IDX, (int)((REG_READ(GPIO_ENABLE_REG) >> PIN) & 1));
 }
 
 }  // namespace buzzer
