@@ -55,5 +55,6 @@ void setBenchMuteFaults(bool on);
 bool benchMuteFaults();
 
 const char* levelName(Level l);
+const char* resetReason();  // why the board last restarted
 
 }  // namespace state

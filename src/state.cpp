@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <freertos/semphr.h>
 
+#include <esp_system.h>
+
 #include <atomic>
 
 namespace state {
@@ -46,6 +48,20 @@ bool takeSilenceRequest() { return silenceRequested.exchange(false); }
 
 void setBenchMuteFaults(bool on) { benchMute = on; }
 bool benchMuteFaults() { return benchMute; }
+
+const char* resetReason() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON: return "power on";
+    case ESP_RST_SW: return "software restart";
+    case ESP_RST_PANIC: return "crash (panic)";
+    case ESP_RST_INT_WDT: return "interrupt watchdog";
+    case ESP_RST_TASK_WDT: return "task watchdog";
+    case ESP_RST_WDT: return "watchdog";
+    case ESP_RST_BROWNOUT: return "brownout";
+    case ESP_RST_EXT: return "reset pin";
+    default: return "other";
+  }
+}
 
 const char* levelName(Level l) {
   switch (l) {

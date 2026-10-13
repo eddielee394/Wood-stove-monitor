@@ -122,6 +122,16 @@ Pin order is per datasheet; Eddie will verify +5V/GND with a multimeter before w
   `ls /dev/cu.usbmodem*`. The board must be plugged **directly** into the Mac —
   a USB hub previously prevented enumeration.
 - Build/flash: `pio run -t upload --upload-port <port>`; monitor: `pio device monitor`.
+- **Over Wi-Fi (preferred once installed):** `./tools/ota-upload.sh` builds and
+  POSTs the firmware to `http://stove-monitor.local/update` (HTTP Basic auth,
+  user `ota`). The password lives only in `~/.config/stove-monitor/ota_password`
+  (600) and in the board's NVS (console `otapass <pw>`, never echoed); OTA is
+  off until it is set. HTTP/TCP was chosen because **UDP and ICMP from Eddie's
+  Mac to the LAN are blocked** (a network extension, likely VPN/security
+  software): ArduinoOTA/espota and `ping` fail, TCP works. Use
+  `dangerouslyDisableSandbox` for LAN commands from Claude's shell.
+- Console `show` prints the last reset reason (also `reset_reason` in
+  `/api/status`) — check it after any unexpected restart.
 - Restore original firmware if ever needed:
   `python -m esptool --port <port> write-flash 0 ~/wt32_backup.bin`
 

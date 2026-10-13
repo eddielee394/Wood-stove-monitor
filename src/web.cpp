@@ -3,8 +3,10 @@
 #include <ESPmDNS.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <libb64/cdecode.h>
 
 #include "net.h"
+#include "ota.h"
 #include "settings.h"
 #include "state.h"
 #include "web_page.h"
@@ -123,6 +125,7 @@ void handleStatus() {
   j.str("ip", ns.ip);
   j.close('}');
   j.integer("uptime", millis() / 1000);
+  j.str("reset_reason", state::resetReason());
   j.integer("sensor_age_ms", s.sensorMs ? millis() - s.sensorMs : -1);
   j.close('}');
   server.sendHeader("Cache-Control", "no-store");
@@ -158,11 +161,53 @@ void handleSettings() {
   server.send(ok ? 200 : 400, "application/json", j.s);
 }
 
+bool uploadAllowed = false;
+
+// HTTP Basic auth "ota:<password>", checked against NVS.
+bool otaAuthorised() {
+  if (!ota::enabled() || !server.hasHeader("Authorization")) return false;
+  String h = server.header("Authorization");
+  if (!h.startsWith("Basic ")) return false;
+  String enc = h.substring(6);
+  char dec[128] = {};
+  if (enc.length() > 160) return false;
+  int n = base64_decode_chars(enc.c_str(), enc.length(), dec);
+  if (n <= 0 || n >= (int)sizeof(dec)) return false;
+  dec[n] = '\0';
+  char* colon = strchr(dec, ':');
+  bool ok = colon && (colon - dec) == 3 && !strncmp(dec, "ota", 3) && ota::checkPassword(colon + 1);
+  memset(dec, 0, sizeof(dec));
+  return ok;
+}
+
+void handleUpload() {
+  HTTPUpload& up = server.upload();
+  if (up.status == UPLOAD_FILE_START) {
+    uploadAllowed = otaAuthorised();
+    if (!uploadAllowed) {
+      Serial.println("ota: rejected upload (bad or missing password)");
+      return;
+    }
+    // Content-Length includes the multipart framing; close enough for progress.
+    ota::startUpdate(server.header("Content-Length").toInt());
+  } else if (!uploadAllowed || ota::progress() < 0) {
+    return;
+  } else if (up.status == UPLOAD_FILE_WRITE) {
+    ota::write(up.buf, up.currentSize);
+  } else if (up.status == UPLOAD_FILE_END) {
+    ota::finish();
+  } else if (up.status == UPLOAD_FILE_ABORTED) {
+    ota::abort();
+  }
+}
+
 }  // namespace
 
 void begin() {
   if (started) return;
   started = true;
+  const char* headers[] = {"Authorization", "Content-Length"};
+  server.collectHeaders(headers, 2);
   server.on("/", HTTP_GET, []() { server.send_P(200, "text/html", WEB_PAGE); });
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/settings", HTTP_POST, handleSettings);
@@ -170,9 +215,27 @@ void begin() {
     state::requestSilence();
     server.send(200, "application/json", "{\"ok\":true}");
   });
+  // Firmware update: POST multipart "firmware" file, Basic auth user "ota".
+  server.on(
+      "/update", HTTP_POST,
+      []() {
+        if (!uploadAllowed) {
+          server.send(401, "text/plain", "Unauthorized\n");
+          return;
+        }
+        bool ok = ota::progress() == 100;
+        server.send(ok ? 200 : 500, "text/plain", ok ? "OK, rebooting\n" : ota::error());
+        if (ok) {
+          delay(500);
+          ESP.restart();
+        }
+      },
+      handleUpload);
   server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
   server.begin();
-  if (MDNS.begin("stove-monitor")) MDNS.addService("http", "tcp", 80);
+  if (MDNS.begin("stove-monitor")) {
+    MDNS.addService("http", "tcp", 80);
+  }
   Serial.println("web: listening on port 80 (http://stove-monitor.local)");
 }
 

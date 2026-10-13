@@ -6,6 +6,7 @@
 
 #include "alarm_screens.h"
 #include "dashboard.h"
+#include "ota.h"
 #include "settings_screen.h"
 #include "wifi_setup.h"
 #include "display.h"
@@ -62,7 +63,21 @@ void openSettings() {
 }
 void closeSettings() { settingsOpen = false; }
 
+lv_obj_t* otaBox;
+lv_obj_t* otaLabel;
+
+void updateOta() {
+  int p = ota::progress();
+  if (p < 0) {
+    show(otaBox, false);
+    return;
+  }
+  show(otaBox, true);
+  lv_label_set_text_fmt(otaLabel, "Updating firmware… %d%%", p);
+}
+
 void refresh() {
+  updateOta();
   state::Snapshot s = state::get();
   settings::Settings cfg = settings::get();
   if (cfg.brightness != brightness) tft.setBrightness(brightness = cfg.brightness);
@@ -143,6 +158,16 @@ void begin() {
         refresh();
       });
   alarm_screens::create();
+  // OTA progress sits on the top layer, over whichever screen is showing.
+  otaBox = box(lv_layer_top());
+  lv_obj_set_size(otaBox, 360, 72);
+  lv_obj_center(otaBox);
+  lv_obj_set_style_radius(otaBox, 12, 0);
+  lv_obj_set_style_bg_color(otaBox, c(ACCENT), 0);
+  lv_obj_set_style_bg_opa(otaBox, LV_OPA_COVER, 0);
+  otaLabel = label(otaBox, &jakarta_20_xb, TEXT, "");
+  lv_obj_center(otaLabel);
+  show(otaBox, false);
   refresh();
 }
 

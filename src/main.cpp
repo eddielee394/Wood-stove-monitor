@@ -23,7 +23,7 @@ void setup() {
   buzzer::begin();  // pin held quiet before anything else
   Serial.begin(115200);
   delay(500);
-  Serial.println("Stove monitor starting");
+  Serial.printf("Stove monitor starting (last reset: %s)\n", state::resetReason());
 
   // Reboot if the sensor or alarm task stops checking in.
   esp_task_wdt_init(WDT_TIMEOUT_S, true);

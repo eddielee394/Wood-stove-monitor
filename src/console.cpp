@@ -4,6 +4,7 @@
 #include <esp_heap_caps.h>
 
 #include "buzzer.h"
+#include "ota.h"
 #include "settings.h"
 #include "state.h"
 
@@ -24,6 +25,7 @@ void show() {
                   c.faulted ? "YES" : "no", c.fault, c.present,
                   state::levelName(s.alarms.temp[i]), s.alarms.fault[i] ? " +FAULT" : "");
   }
+  Serial.printf("last reset: %s, up %lus\n", state::resetReason(), (unsigned long)(millis() / 1000));
   Serial.printf("ideal=%d rate_high=%d reload=%d armed=%d highest=%s silenced=%d audible=%d sensor_age=%lums\n",
                 s.alarms.ideal, s.alarms.rateHigh, s.alarms.reload, s.alarms.reloadArmed,
                 state::levelName(s.alarms.highest),
@@ -62,6 +64,16 @@ void run(char* line) {
     state::setBenchMuteFaults(on);
     println(on ? "ok: bench mode ON - probe faults silent, fault strip hidden, until reboot"
                : "ok: bench mode off - probe faults sound");
+  } else if (!strcmp(cmd, "otapass")) {
+    char* pw = strtok(nullptr, " ");
+    if (pw && strlen(pw) >= 12) {
+      ota::setPassword(pw);  // never echoed
+      println("ok: OTA password saved");
+    } else if (pw) {
+      println("rejected: use at least 12 characters");
+    } else {
+      println(ota::hasPassword() ? "OTA password is set" : "OTA password is NOT set (OTA disabled)");
+    }
   } else if (!strcmp(cmd, "mem")) {
     Serial.printf("heap: internal free %u (min %u, largest %u), psram free %u\n",
                   heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
