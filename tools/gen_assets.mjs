@@ -20,7 +20,7 @@ const fontDir = join(root, 'fonts', 'src');
 mkdirSync(out, { recursive: true });
 
 // ---------------------------------------------------------------- fonts
-const TEXT_SYMBOLS = '°−·–±';
+const TEXT_SYMBOLS = '°−·–±…';
 const FONTS = [
   // Big readouts: digits only keeps this one small.
   { name: 'jakarta_96_xb', file: 'ExtraBold', size: 96, symbols: '0123456789-−' },

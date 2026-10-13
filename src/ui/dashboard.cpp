@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include "net.h"
 #include "theme.h"
 
 namespace ui::dashboard {
@@ -28,6 +29,9 @@ struct Column {
 struct {
   lv_obj_t* screen;
   lv_obj_t* quiet;
+  lv_obj_t* wifi;
+  lv_obj_t* wifiIcon;
+  lv_obj_t* wifiLabel;
   lv_obj_t* freshLabel;
   lv_obj_t* faultChip;
   lv_obj_t* faultChipLabel;
@@ -59,7 +63,10 @@ void buildTopBar(lv_obj_t* scr) {
   lv_obj_t* left = row(bar, 16);
   lv_obj_align(left, LV_ALIGN_LEFT_MID, 16, 0);
 
-  // Wi-Fi status joins this row in Phase 5.
+  ui.wifi = row(left, 6);
+  ui.wifiIcon = icon(ui.wifi, &icon_wifi_20, MUTED);
+  ui.wifiLabel = label(ui.wifi, &jakarta_14_sb, MUTED, "Wi-Fi");
+
   ui.quiet = row(left, 6);
   icon(ui.quiet, &icon_quiet_20, MUTED);
   label(ui.quiet, &jakarta_14_sb, MUTED, "Quiet");
@@ -371,6 +378,14 @@ lv_obj_t* create(void (*onSettings)()) {
 
 void update(const state::Snapshot& s, const settings::Settings& cfg) {
   show(ui.quiet, cfg.quiet);
+
+  net::Status ns = net::status();
+  show(ui.wifi, ns.link != net::Link::NotSetUp);
+  bool online = ns.link == net::Link::Connected;
+  lv_label_set_text(ui.wifiLabel, online ? "Wi-Fi" : "No Wi-Fi");
+  uint32_t wc = online ? MUTED : AMBER;
+  lv_obj_set_style_text_color(ui.wifiLabel, c(wc), 0);
+  lv_obj_set_style_image_recolor(ui.wifiIcon, c(wc), 0);
 
   uint32_t age = s.sensorMs ? (millis() - s.sensorMs) / 1000 : 0;
   lv_label_set_text_fmt(ui.freshLabel, s.sensorMs ? "%lus ago" : "starting", (unsigned long)age);

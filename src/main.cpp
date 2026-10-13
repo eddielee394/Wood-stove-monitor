@@ -9,6 +9,7 @@
 #include "buzzer.h"
 #include "console.h"
 #include "display.h"
+#include "net.h"
 #include "sensors.h"
 #include "settings.h"
 #include "state.h"
@@ -31,6 +32,7 @@ void setup() {
   state::begin();
   sensors::start();
   alarms::start();
+  net::start();  // after the safety tasks; nothing depends on it
 
   tft.init();
   tft.setRotation(1);  // landscape, 480x320

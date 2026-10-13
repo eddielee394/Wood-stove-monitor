@@ -9,7 +9,7 @@
 
 namespace ui::settings_screen {
 
-lv_obj_t* create(void (*onBack)());
+lv_obj_t* create(void (*onBack)(), void (*openPassword)(), void (*closePassword)());
 void update(const settings::Settings& cfg);
 
 }  // namespace ui::settings_screen

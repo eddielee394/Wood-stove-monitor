@@ -7,6 +7,7 @@
 #include "alarm_screens.h"
 #include "dashboard.h"
 #include "settings_screen.h"
+#include "wifi_setup.h"
 #include "display.h"
 #include "settings.h"
 #include "state.h"
@@ -24,6 +25,7 @@ lv_obj_t* dashScreen;
 lv_obj_t* settingsScreen;
 lv_obj_t* shown;
 bool settingsOpen = false;
+bool passwordOpen = false;
 uint32_t lastTouchMs = 0;
 const uint32_t SETTINGS_IDLE_MS = 60000;  // back to the dashboard when idle
 int brightness = -1;
@@ -72,7 +74,10 @@ void refresh() {
   if (settingsOpen && millis() - lastTouchMs > SETTINGS_IDLE_MS) {
     settingsOpen = false;
   }
-  lv_obj_t* want = settingsOpen ? settingsScreen : dashScreen;
+  if (!settingsOpen) passwordOpen = false;
+  lv_obj_t* want = !settingsOpen  ? dashScreen
+                   : passwordOpen ? wifi_setup::passwordScreen()
+                                  : settingsScreen;
   if (!a.silenced) {
     int probe = -1;
     Kind kind = Kind::Warning;
@@ -124,10 +129,19 @@ void begin() {
     openSettings();
     refresh();  // switch now rather than on the next tick
   });
-  settingsScreen = settings_screen::create([]() {
-    closeSettings();
-    refresh();
-  });
+  settingsScreen = settings_screen::create(
+      []() {
+        closeSettings();
+        refresh();
+      },
+      []() {
+        passwordOpen = true;
+        refresh();
+      },
+      []() {
+        passwordOpen = false;
+        refresh();
+      });
   alarm_screens::create();
   refresh();
 }

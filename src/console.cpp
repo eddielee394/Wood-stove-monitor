@@ -1,6 +1,7 @@
 #include "console.h"
 
 #include <Arduino.h>
+#include <esp_heap_caps.h>
 
 #include "buzzer.h"
 #include "settings.h"
@@ -61,6 +62,12 @@ void run(char* line) {
     state::setBenchMuteFaults(on);
     println(on ? "ok: bench mode ON - probe faults silent, fault strip hidden, until reboot"
                : "ok: bench mode off - probe faults sound");
+  } else if (!strcmp(cmd, "mem")) {
+    Serial.printf("heap: internal free %u (min %u, largest %u), psram free %u\n",
+                  heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                  heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+                  heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+                  heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
   } else if (!strcmp(cmd, "buzzer")) {
     buzzer::debug();
   } else if (!strcmp(cmd, "silence")) {

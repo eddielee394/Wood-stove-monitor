@@ -2,14 +2,16 @@
 
 #include <Arduino.h>
 
+#include "net.h"
 #include "theme.h"
+#include "wifi_setup.h"
 
 namespace ui::settings_screen {
 namespace {
 
 const int STEP_F = 25;
 
-enum Tab { STOVE_TAB, FLUE_TAB, ALERTS_TAB };
+enum Tab { STOVE_TAB, FLUE_TAB, ALERTS_TAB, WIFI_TAB, TAB_COUNT };
 
 struct Toggle {
   lv_obj_t* state;
@@ -20,8 +22,9 @@ struct Toggle {
 struct {
   lv_obj_t* screen;
   Tab tab = STOVE_TAB;
-  lv_obj_t* tabBtn[3];
-  lv_obj_t* tabLabel[3];
+  lv_obj_t* tabBtn[TAB_COUNT];
+  lv_obj_t* tabLabel[TAB_COUNT];
+  lv_obj_t* wifi;
   lv_obj_t* limits;
   lv_obj_t* warnValue;
   lv_obj_t* critValue;
@@ -123,13 +126,16 @@ void setToggle(Toggle& t, bool on, const char* onText) {
 
 void selectTab(Tab t) {
   ui.tab = t;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < TAB_COUNT; i++) {
     bool on = i == t;
     lv_obj_set_style_border_color(ui.tabBtn[i], c(on ? ACCENT : BG), 0);
     lv_obj_set_style_text_color(ui.tabLabel[i], c(on ? TEXT : MUTED), 0);
   }
-  show(ui.limits, t != ALERTS_TAB);
+  show(ui.limits, t == STOVE_TAB || t == FLUE_TAB);
   show(ui.alerts, t == ALERTS_TAB);
+  show(ui.wifi, t == WIFI_TAB);
+  // Opening the Wi-Fi tab scans straight away if there's nothing listed yet.
+  if (t == WIFI_TAB && !net::scanning() && net::scanResults().empty()) net::requestScan();
   lv_label_set_text(ui.note, t == FLUE_TAB
                                  ? "Probe at the top of the chimney, where gas exits. Steps of 25°F."
                                  : "Probe on the flue pipe just above the stove collar. Steps of 25°F.");
@@ -149,9 +155,9 @@ void buildHeader(lv_obj_t* scr) {
   lv_obj_center(icon(back, &icon_back_24, MUTED));
   lv_obj_add_event_cb(back, [](lv_event_t*) { if (ui.onBack) ui.onBack(); }, LV_EVENT_CLICKED, nullptr);
 
-  const char* names[3] = {"Stove", "Flue", "Alerts"};
-  const int tabW = (480 - 56) / 3;
-  for (int i = 0; i < 3; i++) {
+  const char* names[TAB_COUNT] = {"Stove", "Flue", "Alerts", "Wi-Fi"};
+  const int tabW = (480 - 56) / TAB_COUNT;
+  for (int i = 0; i < TAB_COUNT; i++) {
     lv_obj_t* b = box(head);
     lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_pos(b, 56 + i * tabW, 0);
@@ -249,7 +255,7 @@ void buildAlerts(lv_obj_t* scr) {
 
 }  // namespace
 
-lv_obj_t* create(void (*onBack)()) {
+lv_obj_t* create(void (*onBack)(), void (*openPassword)(), void (*closePassword)()) {
   ui.onBack = onBack;
   ui.screen = lv_obj_create(nullptr);
   lv_obj_remove_style_all(ui.screen);
@@ -260,6 +266,7 @@ lv_obj_t* create(void (*onBack)()) {
   buildHeader(ui.screen);
   buildLimits(ui.screen);
   buildAlerts(ui.screen);
+  ui.wifi = wifi_setup::buildTab(ui.screen, openPassword, closePassword);
   selectTab(STOVE_TAB);
   return ui.screen;
 }
@@ -280,6 +287,7 @@ void update(const settings::Settings& cfg) {
   int pct = (cfg.brightness * 100 + 127) / 255;
   lv_obj_set_width(ui.brightFill, 104 * pct / 100);
   lv_label_set_text_fmt(ui.brightValue, "%d%%", pct);
+  if (ui.tab == WIFI_TAB) wifi_setup::updateTab();
 }
 
 
