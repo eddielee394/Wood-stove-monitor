@@ -130,6 +130,7 @@ void task(void*) {
     if (p == buzzer::Pattern::Reload && now - reloadSince >= RELOAD_AUDIBLE_MS) {
       p = buzzer::Pattern::None;
     }
+    if (p == buzzer::Pattern::Fault && state::benchMuteFaults()) p = buzzer::Pattern::None;
     buzzer::play(p);
     a.audible = p != buzzer::Pattern::None;
 

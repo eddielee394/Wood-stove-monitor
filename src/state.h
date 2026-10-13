@@ -47,6 +47,11 @@ void setAlarms(const Alarms& a);
 void requestSilence();
 bool takeSilenceRequest();
 
+// Bench mode: probe-fault alarms stay visible but silent. RAM only, so it
+// always clears on reboot; for working on the hardware with a probe unplugged.
+void setBenchMuteFaults(bool on);
+bool benchMuteFaults();
+
 const char* levelName(Level l);
 
 }  // namespace state

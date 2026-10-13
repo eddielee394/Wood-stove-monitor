@@ -11,6 +11,7 @@ namespace {
 SemaphoreHandle_t lock;
 Snapshot snap;
 std::atomic<bool> silenceRequested{false};
+std::atomic<bool> benchMute{false};
 
 }  // namespace
 
@@ -42,6 +43,9 @@ void setAlarms(const Alarms& a) {
 
 void requestSilence() { silenceRequested = true; }
 bool takeSilenceRequest() { return silenceRequested.exchange(false); }
+
+void setBenchMuteFaults(bool on) { benchMute = on; }
+bool benchMuteFaults() { return benchMute; }
 
 const char* levelName(Level l) {
   switch (l) {

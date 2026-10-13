@@ -24,6 +24,8 @@ struct Settings {
   int32_t idealHiF;
   int32_t idealExitF;   // ...and FLUE (chimney exit) is at least this
   int32_t silenceMin;   // a silenced alarm re-arms after this long
+  int32_t silenceCritMin;  // ...or this long for Critical / chimney fire
+  int32_t quiet;        // 0/1: mute Warning and Reload (never Critical/Fault)
   int32_t unitsC;       // 0 = deg F, 1 = deg C
   int32_t brightness;   // backlight 0-255
 };

@@ -55,13 +55,19 @@ void run(char* line) {
     if (settings::apply(settings::defaults(), err, sizeof(err))) {
       println("ok: defaults restored (saved)");
     }
+  } else if (!strcmp(cmd, "bench")) {
+    char* arg = strtok(nullptr, " ");
+    bool on = arg && !strcmp(arg, "on");
+    state::setBenchMuteFaults(on);
+    println(on ? "ok: bench mode ON - probe faults silent until reboot"
+               : "ok: bench mode off - probe faults sound");
   } else if (!strcmp(cmd, "buzzer")) {
     buzzer::debug();
   } else if (!strcmp(cmd, "silence")) {
     state::requestSilence();
     println("ok: silence requested");
   } else {
-    println("commands: show | settings | set <key> <value> | defaults | silence");
+    println("commands: show | settings | set <key> <value> | defaults | silence | bench on|off");
   }
 }
 

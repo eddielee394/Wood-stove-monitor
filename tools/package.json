@@ -1,0 +1,11 @@
+{
+  "name": "stove-monitor-assets",
+  "private": true,
+  "description": "Generates LVGL fonts and icons into src/ui/assets (output is committed)",
+  "type": "module",
+  "scripts": { "gen": "node gen_assets.mjs" },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "lv_font_conv": "^1.5.3"
+  }
+}

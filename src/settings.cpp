@@ -28,6 +28,8 @@ const Field FIELDS[] = {
     {"ideal_hi", &Settings::idealHiF, 50, 2300},
     {"ideal_exit", &Settings::idealExitF, 50, 2300},
     {"silence_min", &Settings::silenceMin, 1, 120},
+    {"silence_crit", &Settings::silenceCritMin, 1, 30},
+    {"quiet", &Settings::quiet, 0, 1},
     {"units_c", &Settings::unitsC, 0, 1},
     {"brightness", &Settings::brightness, 10, 255},
 };
@@ -86,6 +88,8 @@ Settings defaults() {
   s.idealHiF = 550;
   s.idealExitF = 250;
   s.silenceMin = 10;
+  s.silenceCritMin = 2;
+  s.quiet = 0;
   s.unitsC = 0;
   s.brightness = 200;
   return s;
