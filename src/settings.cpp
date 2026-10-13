@@ -132,16 +132,27 @@ bool apply(const Settings& s, char* err, size_t errLen) {
   return true;
 }
 
-bool setByName(const char* key, long value, char* err, size_t errLen) {
+bool assign(Settings& s, const char* key, long value) {
   for (const Field& f : FIELDS) {
     if (strcmp(key, f.key) == 0) {
-      Settings s = get();
       s.*f.member = value;
-      return apply(s, err, errLen);
+      return true;
     }
   }
-  snprintf(err, errLen, "unknown setting '%s'", key);
   return false;
+}
+
+bool setByName(const char* key, long value, char* err, size_t errLen) {
+  Settings s = get();
+  if (!assign(s, key, value)) {
+    snprintf(err, errLen, "unknown setting '%s'", key);
+    return false;
+  }
+  return apply(s, err, errLen);
+}
+
+void forEach(const Settings& s, void (*fn)(const char*, long, long, long, void*), void* ctx) {
+  for (const Field& f : FIELDS) fn(f.key, s.*f.member, f.min, f.max, ctx);
 }
 
 void describe(const Settings& s, void (*line)(const char*)) {

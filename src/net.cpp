@@ -6,6 +6,8 @@
 
 #include <algorithm>
 
+#include "web.h"
+
 namespace net {
 namespace {
 
@@ -153,6 +155,7 @@ void task(void*) {
         wasConnected = true;
         Serial.printf("net: connected, IP %s, RSSI %d\n", WiFi.localIP().toString().c_str(),
                       WiFi.RSSI());
+        web::begin();  // idempotent; keeps serving across reconnects
       } else if (!up && link == Link::Connected) {
         Serial.println("net: connection lost");
         setLink(Link::Disconnected);
@@ -174,7 +177,8 @@ void task(void*) {
                       ? (nextTry - now) / 1000 + 1 : 0;
     xSemaphoreGive(lock);
     publish();
-    vTaskDelay(pdMS_TO_TICKS(250));
+    web::handle();
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
 }
 

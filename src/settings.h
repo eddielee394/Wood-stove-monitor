@@ -36,8 +36,14 @@ Settings get();
 
 // Validate and persist. On failure nothing changes and err explains why.
 bool apply(const Settings& s, char* err, size_t errLen);
+// Set one field of `s` by key name, without validating or saving. Returns
+// false for an unknown key. Pass the result to apply().
+bool assign(Settings& s, const char* key, long value);
 // Change one field by key name (as listed by describe()).
 bool setByName(const char* key, long value, char* err, size_t errLen);
+// Visit every field (key, current value, allowed range), e.g. for JSON.
+void forEach(const Settings& s, void (*fn)(const char* key, long value, long min, long max, void* ctx),
+             void* ctx);
 // One "key = value  (min-max)" line per field, for the serial console.
 void describe(const Settings& s, void (*line)(const char*));
 
