@@ -6,6 +6,7 @@
 
 #include "alarm_screens.h"
 #include "dashboard.h"
+#include "settings_screen.h"
 #include "display.h"
 #include "settings.h"
 #include "state.h"
@@ -20,7 +21,11 @@ const uint32_t UPDATE_MS = 250;
 
 lv_display_t* disp;
 lv_obj_t* dashScreen;
+lv_obj_t* settingsScreen;
 lv_obj_t* shown;
+bool settingsOpen = false;
+uint32_t lastTouchMs = 0;
+const uint32_t SETTINGS_IDLE_MS = 60000;  // back to the dashboard when idle
 int brightness = -1;
 
 void flush(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
@@ -40,6 +45,7 @@ void readTouch(lv_indev_t*, lv_indev_data_t* data) {
   int32_t x, y;
   if (tft.getTouch(&x, &y)) {
     data->state = LV_INDEV_STATE_PRESSED;
+    lastTouchMs = millis();
     data->point.x = x;
     data->point.y = y;
   } else {
@@ -47,9 +53,12 @@ void readTouch(lv_indev_t*, lv_indev_data_t* data) {
   }
 }
 
+void refresh();
 void openSettings() {
-  // Settings screens arrive in a later stage.
+  settingsOpen = true;
+  lastTouchMs = millis();
 }
+void closeSettings() { settingsOpen = false; }
 
 void refresh() {
   state::Snapshot s = state::get();
@@ -60,7 +69,10 @@ void refresh() {
   // dashboard with its own strip, banner or chip.
   using alarm_screens::Kind;
   const state::Alarms& a = s.alarms;
-  lv_obj_t* want = dashScreen;
+  if (settingsOpen && millis() - lastTouchMs > SETTINGS_IDLE_MS) {
+    settingsOpen = false;
+  }
+  lv_obj_t* want = settingsOpen ? settingsScreen : dashScreen;
   if (!a.silenced) {
     int probe = -1;
     Kind kind = Kind::Warning;
@@ -83,6 +95,7 @@ void refresh() {
     }
   }
   if (want == dashScreen) dashboard::update(s, cfg);
+  if (want == settingsScreen) settings_screen::update(cfg);
   if (want != shown) {
     shown = want;
     lv_screen_load(want);
@@ -107,7 +120,14 @@ void begin() {
   lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch, readTouch);
 
-  dashScreen = dashboard::create(openSettings);
+  dashScreen = dashboard::create([]() {
+    openSettings();
+    refresh();  // switch now rather than on the next tick
+  });
+  settingsScreen = settings_screen::create([]() {
+    closeSettings();
+    refresh();
+  });
   alarm_screens::create();
   refresh();
 }
