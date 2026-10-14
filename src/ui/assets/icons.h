@@ -31,6 +31,13 @@ extern const lv_image_dsc_t icon_back_24;
 extern const lv_image_dsc_t icon_minus_24;
 extern const lv_image_dsc_t icon_plus_24;
 extern const lv_image_dsc_t icon_info_20;
+extern const lv_image_dsc_t icon_wx_clear_day_20;
+extern const lv_image_dsc_t icon_wx_clear_night_20;
+extern const lv_image_dsc_t icon_wx_cloudy_20;
+extern const lv_image_dsc_t icon_wx_fog_20;
+extern const lv_image_dsc_t icon_wx_rain_20;
+extern const lv_image_dsc_t icon_wx_snow_20;
+extern const lv_image_dsc_t icon_wx_storm_20;
 extern const lv_image_dsc_t icon_reload_32;
 
 #ifdef __cplusplus

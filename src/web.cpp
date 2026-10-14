@@ -3,12 +3,14 @@
 #include <ESPmDNS.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <esp_heap_caps.h>
 #include <libb64/cdecode.h>
 
 #include "net.h"
 #include "ota.h"
 #include "settings.h"
 #include "state.h"
+#include "weather.h"
 #include "web_page.h"
 
 namespace web {
@@ -124,7 +126,22 @@ void handleStatus() {
   j.integer("rssi", ns.rssi);
   j.str("ip", ns.ip);
   j.close('}');
+  weather::Status w = weather::status();
+  j.open("outside", '{');
+  j.boolean("located", w.located);
+  j.boolean("valid", w.valid);
+  j.num("temp", w.tempF);
+  j.str("sky", weather::skyName(w.sky));
+  j.boolean("day", w.isDay);
+  j.integer("age", w.ageS);
+  j.str("sunrise", w.sunrise);
+  j.str("sunset", w.sunset);
+  j.str("error", w.error);
+  j.num("lat", w.lat, 4);
+  j.num("lon", w.lon, 4);
+  j.close('}');
   j.integer("uptime", millis() / 1000);
+  j.integer("heap_internal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
   j.str("reset_reason", state::resetReason());
   j.integer("sensor_age_ms", s.sensorMs ? millis() - s.sensorMs : -1);
   j.close('}');
@@ -159,6 +176,25 @@ void handleSettings() {
   settingsJson(j, settings::get());
   j.close('}');
   server.send(ok ? 200 : 400, "application/json", j.s);
+}
+
+// lat=..&lon=.. sets the outside-temperature location; both empty clears it.
+void handleLocation() {
+  String lat = server.arg("lat"), lon = server.arg("lon");
+  lat.trim();
+  lon.trim();
+  bool ok;
+  if (lat.isEmpty() && lon.isEmpty()) {
+    weather::clearLocation();
+    ok = true;
+  } else {
+    char *e1 = nullptr, *e2 = nullptr;
+    float a = strtof(lat.c_str(), &e1), b = strtof(lon.c_str(), &e2);
+    ok = !lat.isEmpty() && !lon.isEmpty() && !*e1 && !*e2 && weather::setLocation(a, b);
+  }
+  server.send(ok ? 200 : 400, "application/json",
+              ok ? "{\"ok\":true}"
+                 : "{\"ok\":false,\"error\":\"latitude -90 to 90, longitude -180 to 180\"}");
 }
 
 bool uploadAllowed = false;
@@ -211,6 +247,7 @@ void begin() {
   server.on("/", HTTP_GET, []() { server.send_P(200, "text/html", WEB_PAGE); });
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/settings", HTTP_POST, handleSettings);
+  server.on("/api/location", HTTP_POST, handleLocation);
   server.on("/api/silence", HTTP_POST, []() {
     state::requestSilence();
     server.send(200, "application/json", "{\"ok\":true}");

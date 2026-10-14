@@ -3,6 +3,7 @@
 //   GET  /api/status    readings, alarms, settings, Wi-Fi
 //   POST /api/settings  form-encoded key=value pairs, applied atomically
 //   POST /api/silence   same as tapping Silence on the screen
+//   POST /api/location  lat=..&lon=.. for the outside temperature (empty clears)
 #pragma once
 
 namespace web {

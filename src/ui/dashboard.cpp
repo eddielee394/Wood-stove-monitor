@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "net.h"
+#include "weather.h"
 #include "theme.h"
 
 namespace ui::dashboard {
@@ -37,6 +38,10 @@ struct {
   lv_obj_t* faultChipLabel;
   lv_obj_t* silencedChip;
   lv_obj_t* silencedLabel;
+  lv_obj_t* left;           // top-bar status row
+  lv_obj_t* outside;        // outside temperature, right of the status row
+  lv_obj_t* outsideIcon;
+  lv_obj_t* outsideLabel;
   lv_obj_t* faultStrip;      // artboard 3: probe fault with Silence button
   lv_obj_t* faultStripTitle;
   lv_obj_t* faultStripBtn;
@@ -60,7 +65,7 @@ void buildTopBar(lv_obj_t* scr) {
   lv_obj_set_style_border_width(bar, 1, 0);
   lv_obj_set_style_border_color(bar, c(BORDER), 0);
 
-  lv_obj_t* left = row(bar, 16);
+  lv_obj_t* left = ui.left = row(bar, 16);
   lv_obj_align(left, LV_ALIGN_LEFT_MID, 16, 0);
 
   ui.wifi = row(left, 6);
@@ -82,6 +87,11 @@ void buildTopBar(lv_obj_t* scr) {
   ui.silencedChip = row(left, 6);
   icon(ui.silencedChip, &icon_silence_22, AMBER);
   ui.silencedLabel = label(ui.silencedChip, &jakarta_14_xb, AMBER, "");
+
+  ui.outside = row(bar, 6);
+  ui.outsideIcon = icon(ui.outside, &icon_wx_cloudy_20, MUTED);
+  ui.outsideLabel = label(ui.outside, &jakarta_14_sb, MUTED, "");
+  lv_obj_align(ui.outside, LV_ALIGN_RIGHT_MID, -60, 0);
 
   // Settings button (History arrives in Phase 7).
   lv_obj_t* btn = box(bar);
@@ -328,6 +338,41 @@ void updateZone(const state::Snapshot& s, const settings::Settings& cfg) {
   if (st.valid) lv_obj_set_pos(ui.marker, ZONE_PAD + scaleX(st.tempF) - 10, 44);
 }
 
+const lv_image_dsc_t* skyIcon(weather::Sky s, bool day) {
+  switch (s) {
+    case weather::Sky::Clear: return day ? &icon_wx_clear_day_20 : &icon_wx_clear_night_20;
+    case weather::Sky::Fog: return &icon_wx_fog_20;
+    case weather::Sky::Rain: return &icon_wx_rain_20;
+    case weather::Sky::Snow: return &icon_wx_snow_20;
+    case weather::Sky::Storm: return &icon_wx_storm_20;
+    default: return &icon_wx_cloudy_20;
+  }
+}
+
+// Outside temperature, informational only. It gives way to the status chips
+// on the left: first the word "outside" goes, then the whole item.
+void updateOutside(bool unitsC) {
+  weather::Status w = weather::status();
+  if (!w.located) {
+    show(ui.outside, false);
+    return;
+  }
+  const lv_image_dsc_t* ic = skyIcon(w.sky, w.isDay);
+  if (lv_image_get_src(ui.outsideIcon) != ic) lv_image_set_src(ui.outsideIcon, ic);
+  char t[16];
+  if (w.valid) snprintf(t, sizeof(t), "%d°%c", (int)lroundf(toUnits(w.tempF, unitsC)), unitsC ? 'C' : 'F');
+  else strlcpy(t, "--", sizeof(t));
+  show(ui.outside, true);
+  for (int pass = 0; pass < 2; pass++) {
+    char text[32];
+    snprintf(text, sizeof(text), pass == 0 ? "%s outside" : "%s", t);
+    if (strcmp(lv_label_get_text(ui.outsideLabel), text)) lv_label_set_text(ui.outsideLabel, text);
+    lv_obj_update_layout(ui.outside);
+    if (lv_obj_get_x(ui.left) + lv_obj_get_width(ui.left) + 12 <= lv_obj_get_x(ui.outside)) return;
+  }
+  show(ui.outside, false);
+}
+
 void updateColumn(int i, const state::Channel& ch, bool unitsC) {
   Column& k = ui.col[i];
   bool ok = ch.valid;
@@ -409,6 +454,7 @@ void update(const state::Snapshot& s, const settings::Settings& cfg) {
                           a.silenceLeftS % 60);
   }
 
+  updateOutside(cfg.unitsC);
   for (int i = 0; i < thermo::COUNT; i++) updateColumn(i, s.ch[i], cfg.unitsC);
   updateZone(s, cfg);
 

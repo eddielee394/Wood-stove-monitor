@@ -55,8 +55,11 @@ label{display:flex;justify-content:space-between;align-items:center;gap:12px;pad
 input[type=number]{width:110px;font:inherit;padding:10px;border-radius:8px;border:1px solid #2E3D4F;background:#17212C;color:var(--text);text-align:right}
 input[type=checkbox]{width:24px;height:24px}
 .save{background:var(--accent);color:#fff;margin:8px 0 16px}
-#msg{font-size:14px;margin-left:8px}
+#msg,#locmsg{font-size:14px;margin-left:8px}
 .err{color:var(--amber)}.ok{color:var(--green)}
+.outside{color:var(--muted);font-size:15px;margin:-4px 0 12px}
+.hint{color:var(--subtle);font-size:13px;margin:4px 0 8px}
+input.loc{width:100%;font:inherit;padding:10px;border-radius:8px;border:1px solid #2E3D4F;background:#17212C;color:var(--text)}
 footer{color:var(--subtle);font-size:13px;margin-top:16px}
 @media (max-width:420px){.cards{grid-template-columns:1fr}}
 </style>
@@ -64,6 +67,7 @@ footer{color:var(--subtle);font-size:13px;margin-top:16px}
 <body>
 <main>
 <header><h1>Stove Monitor</h1><span class="fresh" id="fresh">connecting…</span></header>
+<div class="outside" id="outside"></div>
 <div class="banner" id="banner"><div><b id="bTitle"></b><span id="bText"></span></div>
 <button id="bBtn" type="button">Silence</button></div>
 <section class="cards">
@@ -98,6 +102,12 @@ footer{color:var(--subtle);font-size:13px;margin-top:16px}
 <label>Show °C <input type="checkbox" name="units_c"></label>
 <label>Brightness (10–255) <input type="number" name="brightness"></label></fieldset>
 <button class="save" type="submit">Save</button><span id="msg"></span>
+</form>
+<form id="loc">
+<fieldset><legend>LOCATION (OUTSIDE TEMPERATURE)</legend>
+<p class="hint">In Google Maps, right-click your house (long-press on a phone) and copy the coordinates, then paste them here. Leave empty to turn the outside temperature off. Stored only on the monitor.</p>
+<input class="loc" type="text" name="coords" autocomplete="off" placeholder="e.g. 41.87811, -87.62980"></fieldset>
+<button class="save" type="submit">Save location</button><span id="locmsg"></span>
 </form>
 </details>
 <footer id="foot"></footer>
@@ -135,6 +145,15 @@ function zone(s){
   else{t='Ideal burn';c='ideal'}
   z.textContent=t;z.className='status '+c;
 }
+const h12=t=>{if(!t)return'';let[h,m]=t.split(':').map(Number);const ap=h<12?'am':'pm';h=h%12||12;return h+':'+String(m).padStart(2,'0')+ap};
+function outside(o){
+  const el=$('outside');
+  if(!o.located){el.textContent='';return}
+  let t=o.valid?'Outside '+Math.round(conv(o.temp))+U()+(o.sky?' · '+o.sky:''):'Outside temperature unavailable'+(o.error?' ('+o.error+')':'');
+  if(o.sunrise&&o.sunset)t+=' · sunrise '+h12(o.sunrise)+', sunset '+h12(o.sunset);
+  el.textContent=t;
+}
+let locLoaded=false;
 let settingsLoaded=false;
 function fillSettings(g){
   for(const el of $('form').elements){if(!el.name||!(el.name in g))continue;
@@ -148,6 +167,8 @@ async function poll(){
     for(let i=0;i<2;i++)card(i,s.ch[i],s.alarms.temp[i],s.alarms.fault[i]);
     banner(s);zone(s);
     if(!settingsLoaded)fillSettings(s.settings);
+    outside(s.outside);
+    if(!locLoaded){if(s.outside.located)$('loc').elements.coords.value=s.outside.lat+', '+s.outside.lon;locLoaded=true}
     $('fresh').textContent='live';$('fresh').className='fresh';
     $('foot').textContent='Wi-Fi '+s.wifi.ssid+' · '+s.wifi.rssi+' dBm · up '+Math.floor(s.uptime/60)+' min';
   }catch(e){
@@ -162,6 +183,13 @@ $('form').onsubmit=async e=>{
   const r=await fetch('/api/settings',{method:'POST',body});const j=await r.json();
   $('msg').textContent=j.ok?'Saved':j.error;$('msg').className=j.ok?'ok':'err';
   if(j.settings)fillSettings(j.settings);
+};
+$('loc').onsubmit=async e=>{
+  e.preventDefault();const v=e.target.elements.coords.value.trim(),m=v.match(/^(-?[\d.]+)\s*[,\s]\s*(-?[\d.]+)$/);
+  if(v&&!m){$('locmsg').textContent='Paste two numbers, e.g. 41.87811, -87.62980';$('locmsg').className='err';return}
+  const body=new URLSearchParams({lat:m?m[1]:'',lon:m?m[2]:''});
+  const r=await fetch('/api/location',{method:'POST',body});const j=await r.json();
+  $('locmsg').textContent=j.ok?'Saved':j.error;$('locmsg').className=j.ok?'ok':'err';poll();
 };
 poll();setInterval(poll,2000);
 </script>

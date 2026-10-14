@@ -156,6 +156,7 @@ void task(void*) {
         Serial.printf("net: connected, IP %s, RSSI %d\n", WiFi.localIP().toString().c_str(),
                       WiFi.RSSI());
         web::begin();  // idempotent; keeps serving across reconnects
+        configTime(0, 0, "pool.ntp.org", "time.google.com");  // UTC clock, for TLS dates
       } else if (!up && link == Link::Connected) {
         Serial.println("net: connection lost");
         setLink(Link::Disconnected);

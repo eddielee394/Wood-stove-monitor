@@ -52,6 +52,10 @@ const dot = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#000"/>
 const TRIANGLE = stroke('M12 3L2 20h20z', 2.5) + stroke('M12 10v4M12 17v.5', 2.5);
 const BELL_OFF = stroke('M18 16v-5a6 6 0 0 0-9.5-4.9M6 9.5V16l-2 2h13M10 21h4M3 3l18 18', 2.5);
 
+// Weather (outside temperature in the top bar)
+const CLOUD = 'M7 19a4.5 4.5 0 0 1-.4-8.98A6 6 0 0 1 18 9.5a4.75 4.75 0 0 1 .5 9.5z';
+const CLOUD_TOP = 'M7 15a3.5 3.5 0 0 1-.4-6.98A5.5 5.5 0 0 1 17.2 7.6a3.7 3.7 0 0 1 .3 7.4z';
+
 const ICONS = {
   wifi: { sizes: [20], svg: stroke('M2 8.5a15 15 0 0 1 20 0M5 12a10.5 10.5 0 0 1 14 0M8.5 15.5a5.5 5.5 0 0 1 7 0') + dot(12, 19, 1.2) },
   quiet: { sizes: [20], svg: stroke('M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z') },
@@ -74,6 +78,13 @@ const ICONS = {
   minus: { sizes: [24], svg: stroke('M5 12h14', 2.5) },
   plus: { sizes: [24], svg: stroke('M5 12h14M12 5v14', 2.5) },
   info: { sizes: [20], svg: ring(12, 12, 9) + stroke('M12 11v6M12 7.5v.5') },
+  wx_clear_day: { sizes: [20], svg: ring(12, 12, 4) + stroke('M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4') },
+  wx_clear_night: { sizes: [20], svg: stroke('M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z') },
+  wx_cloudy: { sizes: [20], svg: stroke(CLOUD) },
+  wx_fog: { sizes: [20], svg: stroke('M4 8h16M3 12h18M5 16h14M8 20h8') },
+  wx_rain: { sizes: [20], svg: stroke(CLOUD_TOP) + stroke('M8 18l-1 3M12 18l-1 3M16 18l-1 3') },
+  wx_snow: { sizes: [20], svg: stroke(CLOUD_TOP) + dot(8, 19, 1.2) + dot(12, 21, 1.2) + dot(16, 19, 1.2) },
+  wx_storm: { sizes: [20], svg: stroke(CLOUD_TOP) + stroke('M13 16l-2.5 3h3.5l-2.5 3') },
   reload: { sizes: [32], svg: '<rect x="2.5" y="8.5" width="19" height="8" rx="4" fill="none" stroke="#000" stroke-width="2"/>' + ring(17.5, 12.5, 2) + stroke('M7 8.5V6M11 8.5V5') },
 };
 

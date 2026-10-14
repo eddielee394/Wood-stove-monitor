@@ -261,6 +261,19 @@ Original spec:
 - Live temperatures, rates, alarm state, and settings, reachable from any phone on
   the LAN. Works without Home Assistant.
 
+### Outside temperature (added after Phase 5)
+Display-only, never used by alarms. `src/weather.cpp` fetches current
+temperature, sky and sunrise/sunset from Open-Meteo (free, no key) over HTTPS
+every 15 min in its own priority-1 task on core 0; failures retry from 1 min,
+doubling to 15 min, and the reading shows "--" once it is over an hour old.
+TLS is verified against ISRG Root X1 (`src/weather_ca.h`, valid to 2035); if
+Open-Meteo changes CA the web page shows the TLS error. The location is set on
+the web page (paste Google Maps coordinates) or console `location <lat> <lon>`
+/ `location clear` and is stored only in NVS namespace `weather` — **never put
+Eddie's coordinates in the repo (it is public)**. The net task also syncs the
+clock over NTP (UTC) once Wi-Fi connects. Top bar: icon + "28°F outside",
+shortened to "28°F" and then hidden if the status chips need the room.
+
 ### Home Assistant (later phase)
 - Eddie does not run Home Assistant yet. Build MQTT support so it can be switched on
   later by setting a broker address.

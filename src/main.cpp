@@ -14,6 +14,7 @@
 #include "settings.h"
 #include "state.h"
 #include "ui/ui.h"
+#include "weather.h"
 
 LGFX tft;
 
@@ -33,6 +34,7 @@ void setup() {
   sensors::start();
   alarms::start();
   net::start();  // after the safety tasks; nothing depends on it
+  weather::start();
 
   tft.init();
   tft.setRotation(1);  // landscape, 480x320
