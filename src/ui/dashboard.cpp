@@ -73,8 +73,7 @@ void buildTopBar(lv_obj_t* scr) {
   ui.wifiLabel = label(ui.wifi, &jakarta_14_sb, MUTED, "Wi-Fi");
 
   ui.quiet = row(left, 6);
-  icon(ui.quiet, &icon_quiet_20, MUTED);
-  label(ui.quiet, &jakarta_14_sb, MUTED, "Quiet");
+  icon(ui.quiet, &icon_quiet_20, MUTED);  // icon only: Quiet mode is on
 
   lv_obj_t* fresh = row(left, 6);
   icon(fresh, &icon_fresh_20, MUTED);
@@ -349,8 +348,8 @@ const lv_image_dsc_t* skyIcon(weather::Sky s, bool day) {
   }
 }
 
-// Outside temperature, informational only. It gives way to the status chips
-// on the left: first the word "outside" goes, then the whole item.
+// Outside temperature, informational only: weather icon + "52°F". It gives
+// way to the status chips on the left when they need the room.
 void updateOutside(bool unitsC) {
   weather::Status w = weather::status();
   if (!w.located) {
@@ -362,15 +361,10 @@ void updateOutside(bool unitsC) {
   char t[16];
   if (w.valid) snprintf(t, sizeof(t), "%d°%c", (int)lroundf(toUnits(w.tempF, unitsC)), unitsC ? 'C' : 'F');
   else strlcpy(t, "--", sizeof(t));
+  if (strcmp(lv_label_get_text(ui.outsideLabel), t)) lv_label_set_text(ui.outsideLabel, t);
   show(ui.outside, true);
-  for (int pass = 0; pass < 2; pass++) {
-    char text[32];
-    snprintf(text, sizeof(text), pass == 0 ? "%s outside" : "%s", t);
-    if (strcmp(lv_label_get_text(ui.outsideLabel), text)) lv_label_set_text(ui.outsideLabel, text);
-    lv_obj_update_layout(ui.outside);
-    if (lv_obj_get_x(ui.left) + lv_obj_get_width(ui.left) + 12 <= lv_obj_get_x(ui.outside)) return;
-  }
-  show(ui.outside, false);
+  lv_obj_update_layout(ui.outside);
+  show(ui.outside, lv_obj_get_x(ui.left) + lv_obj_get_width(ui.left) + 12 <= lv_obj_get_x(ui.outside));
 }
 
 void updateColumn(int i, const state::Channel& ch, bool unitsC) {

@@ -58,7 +58,8 @@ const CLOUD_TOP = 'M7 15a3.5 3.5 0 0 1-.4-6.98A5.5 5.5 0 0 1 17.2 7.6a3.7 3.7 0 
 
 const ICONS = {
   wifi: { sizes: [20], svg: stroke('M2 8.5a15 15 0 0 1 20 0M5 12a10.5 10.5 0 0 1 14 0M8.5 15.5a5.5 5.5 0 0 1 7 0') + dot(12, 19, 1.2) },
-  quiet: { sizes: [20], svg: stroke('M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z') },
+  // Quiet mode / muted: a crossed-out bell. Moon and sun are kept for weather.
+  quiet: { sizes: [20], svg: BELL_OFF },
   fresh: { sizes: [20], svg: stroke('M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4') },
   history: { sizes: [24], svg: stroke('M4 4v16h16M7 15l4-5 3 3 5-6') },
   settings: { sizes: [24], svg: stroke('M4 7h10M18 7h2M4 17h4M12 17h8') + ring(16, 7, 2) + ring(10, 17, 2) },

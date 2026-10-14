@@ -271,8 +271,10 @@ Open-Meteo changes CA the web page shows the TLS error. The location is set on
 the web page (paste Google Maps coordinates) or console `location <lat> <lon>`
 / `location clear` and is stored only in NVS namespace `weather` — **never put
 Eddie's coordinates in the repo (it is public)**. The net task also syncs the
-clock over NTP (UTC) once Wi-Fi connects. Top bar: icon + "28°F outside",
-shortened to "28°F" and then hidden if the status chips need the room.
+clock over NTP (UTC) once Wi-Fi connects. Top bar (right, beside the
+gear): weather icon + "28°F" only (Eddie: no "outside" text), hidden if the
+status chips need the room. Quiet mode is a crossed-out bell with no text;
+moon/sun icons are reserved for weather and time.
 
 ### Home Assistant (later phase)
 - Eddie does not run Home Assistant yet. Build MQTT support so it can be switched on
