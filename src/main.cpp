@@ -14,6 +14,7 @@
 #include "settings.h"
 #include "state.h"
 #include "ui/ui.h"
+#include "version.h"
 #include "weather.h"
 
 LGFX tft;
@@ -24,7 +25,7 @@ void setup() {
   buzzer::begin();  // pin held quiet before anything else
   Serial.begin(115200);
   delay(500);
-  Serial.printf("Stove monitor starting (last reset: %s)\n", state::resetReason());
+  Serial.printf("Stove monitor %s starting (last reset: %s)\n", version::get(), state::resetReason());
 
   // Reboot if the sensor or alarm task stops checking in.
   esp_task_wdt_init(WDT_TIMEOUT_S, true);

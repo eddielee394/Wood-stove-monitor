@@ -4,6 +4,7 @@
 
 #include "net.h"
 #include "theme.h"
+#include "version.h"
 #include "wifi_setup.h"
 
 namespace ui::settings_screen {
@@ -209,6 +210,11 @@ void buildLimits(lv_obj_t* scr) {
   ui.note = label(noteRow, &jakarta_14_sb, MUTED, "");
   lv_label_set_long_mode(ui.note, LV_LABEL_LONG_MODE_WRAP);
   lv_obj_set_width(ui.note, 400);
+
+  lv_obj_t* ver = label(ui.limits, &jakarta_14_sb, SUBTLE, "");
+  lv_label_set_text_fmt(ver, "Firmware %s", version::get());
+  lv_obj_add_flag(ver, LV_OBJ_FLAG_IGNORE_LAYOUT);
+  lv_obj_align(ver, LV_ALIGN_BOTTOM_LEFT, 0, -12);
 }
 
 void buildAlerts(lv_obj_t* scr) {

@@ -7,6 +7,7 @@
 #include "ota.h"
 #include "settings.h"
 #include "state.h"
+#include "version.h"
 #include "weather.h"
 
 namespace console {
@@ -26,7 +27,8 @@ void show() {
                   c.faulted ? "YES" : "no", c.fault, c.present,
                   state::levelName(s.alarms.temp[i]), s.alarms.fault[i] ? " +FAULT" : "");
   }
-  Serial.printf("last reset: %s, up %lus\n", state::resetReason(), (unsigned long)(millis() / 1000));
+  Serial.printf("firmware %s, last reset: %s, up %lus\n", version::get(), state::resetReason(),
+                (unsigned long)(millis() / 1000));
   Serial.printf("ideal=%d rate_high=%d reload=%d armed=%d highest=%s silenced=%d audible=%d sensor_age=%lums\n",
                 s.alarms.ideal, s.alarms.rateHigh, s.alarms.reload, s.alarms.reloadArmed,
                 state::levelName(s.alarms.highest),

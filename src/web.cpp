@@ -10,6 +10,7 @@
 #include "ota.h"
 #include "settings.h"
 #include "state.h"
+#include "version.h"
 #include "weather.h"
 #include "web_page.h"
 
@@ -140,6 +141,7 @@ void handleStatus() {
   j.num("lat", w.lat, 4);
   j.num("lon", w.lon, 4);
   j.close('}');
+  j.str("version", version::get());
   j.integer("uptime", millis() / 1000);
   j.integer("heap_internal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
   j.str("reset_reason", state::resetReason());

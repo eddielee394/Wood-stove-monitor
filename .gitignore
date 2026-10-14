@@ -4,3 +4,5 @@ cmake-build-*/
 .idea/
 .DS_Store
 tools/node_modules/
+include/version_gen.h
+dist/

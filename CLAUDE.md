@@ -130,6 +130,17 @@ Pin order is per datasheet; Eddie will verify +5V/GND with a multimeter before w
   Mac to the LAN are blocked** (a network extension, likely VPN/security
   software): ArduinoOTA/espota and `ping` fail, TCP works. Use
   `dangerouslyDisableSandbox` for LAN commands from Claude's shell.
+- **Versions and releases:** MAJOR.MINOR.PATCH, below 1.0 until the
+  monitor is mounted and its thresholds are checked against real burns.
+  `tools/version.py` (a PlatformIO pre-script) stamps each build from
+  `git describe` (`v0.6.0`, `v0.6.0-3-gabc1234`, `...-dirty`) into
+  `include/version_gen.h` (gitignored). The version shows on the Settings
+  Stove/Flue tab, in the web footer, in `/api/status` and in console `show`.
+  To release: add a `## vX.Y.Z` section to `CHANGELOG.md`, commit and push,
+  then `tools/release.sh X.Y.Z [--install 192.168.1.98]`. It tags, builds,
+  attaches the OTA `.bin` and a full USB recovery image (which erases NVS)
+  to a GitHub Release, and can install the release over Wi-Fi. Ask Eddie
+  before cutting a release.
 - Console `show` prints the last reset reason (also `reset_reason` in
   `/api/status`) — check it after any unexpected restart.
 - Restore original firmware if ever needed:

@@ -170,7 +170,7 @@ async function poll(){
     outside(s.outside);
     if(!locLoaded){if(s.outside.located)$('loc').elements.coords.value=s.outside.lat+', '+s.outside.lon;locLoaded=true}
     $('fresh').textContent='live';$('fresh').className='fresh';
-    $('foot').textContent='Wi-Fi '+s.wifi.ssid+' · '+s.wifi.rssi+' dBm · up '+Math.floor(s.uptime/60)+' min';
+    $('foot').textContent='Firmware '+s.version+' · Wi-Fi '+s.wifi.ssid+' · '+s.wifi.rssi+' dBm · up '+Math.floor(s.uptime/60)+' min';
   }catch(e){
     const ago=Math.round((Date.now()-lastOk)/1000);
     $('fresh').textContent=lastOk?'offline · last update '+ago+'s ago':'cannot reach the monitor';$('fresh').className='fresh stale';
