@@ -31,7 +31,7 @@ struct {
   lv_obj_t* critValue;
   lv_obj_t* note;
   lv_obj_t* alerts;
-  lv_obj_t* reloadSub;
+  lv_obj_t* reloadValue;
   Toggle reload, quiet;
   lv_obj_t* brightFill;
   lv_obj_t* brightValue;
@@ -96,9 +96,9 @@ lv_obj_t* stepper(lv_obj_t* parent, lv_obj_t** valueOut, lv_event_cb_t down, lv_
   return r;
 }
 
-Toggle toggleRow(lv_obj_t* parent, const char* title, const char* sub, lv_event_cb_t cb,
+Toggle toggleRow(lv_obj_t* parent, int h, const char* title, const char* sub, lv_event_cb_t cb,
                  lv_obj_t** subOut = nullptr) {
-  lv_obj_t* r = settingRow(parent, 88, true);
+  lv_obj_t* r = settingRow(parent, h, true);
   lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(r, cb, LV_EVENT_CLICKED, nullptr);
   lv_obj_align(titled(r, title, sub, subOut), LV_ALIGN_LEFT_MID, 0, 0);
@@ -223,14 +223,29 @@ void buildAlerts(lv_obj_t* scr) {
   lv_obj_set_size(ui.alerts, 448, 272);
   lv_obj_set_flex_flow(ui.alerts, LV_FLEX_FLOW_COLUMN);
 
-  ui.reload = toggleRow(ui.alerts, "Reload alert", "", [](lv_event_t*) {
+  // Four rows share the 272px panel: 64 + 64 + 64 + 80.
+  ui.reload = toggleRow(ui.alerts, 64, "Reload alert", "Double beep when the stove cools", [](lv_event_t*) {
     change([](settings::Settings& s) { s.reloadOn = !s.reloadOn; });
-  }, &ui.reloadSub);
-  ui.quiet = toggleRow(ui.alerts, "Quiet mode", "Critical alarms always sound", [](lv_event_t*) {
+  });
+
+  // Reload temperature; must stay below the STOVE warning (the setter checks).
+  lv_obj_t* rl = settingRow(ui.alerts, 64, true);
+  lv_obj_align(titled(rl, "Reload below", "Stove temperature · steps of 25°F"), LV_ALIGN_LEFT_MID, 0, 0);
+  lv_obj_t* rs = stepper(
+      rl, &ui.reloadValue,
+      [](lv_event_t*) { change([](settings::Settings& s) { s.reloadF -= STEP_F; }); },
+      [](lv_event_t*) {
+        change([](settings::Settings& s) {
+          if (s.reloadF + STEP_F < s.stoveWarnF) s.reloadF += STEP_F;
+        });
+      });
+  lv_obj_align(rs, LV_ALIGN_RIGHT_MID, 0, 0);
+
+  ui.quiet = toggleRow(ui.alerts, 64, "Quiet mode", "Critical alarms always sound", [](lv_event_t*) {
     change([](settings::Settings& s) { s.quiet = !s.quiet; });
   });
 
-  lv_obj_t* b = settingRow(ui.alerts, 96, false);
+  lv_obj_t* b = settingRow(ui.alerts, 80, false);
   lv_obj_t* t = label(b, &jakarta_20_xb, TEXT, "Brightness");
   lv_obj_align(t, LV_ALIGN_LEFT_MID, 0, 0);
   lv_obj_t* r = row(b, 12);
@@ -285,8 +300,8 @@ void update(const settings::Settings& cfg) {
   lv_label_set_text_fmt(ui.warnValue, "%d%s", (int)lroundf(toUnits(warn, unitsC)), u);
   lv_label_set_text_fmt(ui.critValue, "%d%s", (int)lroundf(toUnits(crit, unitsC)), u);
 
-  lv_label_set_text_fmt(ui.reloadSub, "When the stove cools below %d%s",
-                        (int)lroundf(toUnits(cfg.reloadF, unitsC)), u);
+  lv_label_set_text_fmt(ui.reloadValue, "%d%s", (int)lroundf(toUnits(cfg.reloadF, unitsC)), u);
+  lv_obj_set_style_text_color(ui.reloadValue, c(cfg.reloadOn ? TEXT : MUTED), 0);
   setToggle(ui.reload, cfg.reloadOn, "On");
   setToggle(ui.quiet, cfg.quiet, "Quiet");
 

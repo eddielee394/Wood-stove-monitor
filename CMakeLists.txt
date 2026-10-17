@@ -4,4 +4,4 @@ project(blazeguard_monitoring)
 set(CMAKE_CXX_STANDARD 14)
 
 add_executable(blazeguard_monitoring
-    src/main.cpp)
+        src/main.cpp)

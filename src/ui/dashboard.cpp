@@ -118,7 +118,6 @@ void buildColumn(lv_obj_t* scr, int i) {
   lv_obj_set_pos(name, 16, 12);
   lv_obj_t* n = label(name, &jakarta_20_xb, MUTED, i == thermo::STOVE ? "STOVE" : "FLUE");
   lv_obj_set_style_text_letter_space(n, 1, 0);
-  label(name, &jakarta_14_sb, SUBTLE, i == thermo::STOVE ? "collar pipe" : "chimney exit");
 
   // 96px reading; digit tops sit ~13px into the design's 96px line box.
   k.value = row(col, 4, LV_FLEX_ALIGN_START);

@@ -11,6 +11,14 @@ Each release on GitHub has two files:
 - `stove-monitor-vX.Y.Z-full.bin`: USB recovery image, flashed at 0x0. It
   erases settings, Wi-Fi and the OTA password.
 
+## v0.7.0 - 2026-10-16
+
+- **Reload temperature on the touchscreen:** Settings → Alerts has a new
+  "Reload below" row with − / + buttons (steps of 25°F). It always stays
+  below the STOVE warning. It could already be set from the web page.
+- **Cleaner dashboard:** the "collar pipe" and "chimney exit" labels under
+  STOVE and FLUE are gone, to free up space.
+
 ## v0.6.0 - 2026-10-13
 
 First versioned release: everything built so far (phases 0-5) plus the
