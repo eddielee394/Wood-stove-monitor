@@ -81,7 +81,9 @@ Pin order is per datasheet; Eddie will verify +5V/GND with a multimeter before w
 ### Thermocouple front end
 - 2× Adafruit MAX31856 breakouts (product #3263), powered from 5V (onboard regulator
   and level shifting; logic is 3.3V-safe).
-- Mounted in a separate passive junction box, connected by a short (<1m) Cat5 run.
+- Mounted in a separate passive junction box, connected by a short (<1m) Cat6 patch
+  cable between RJ45 jacks (T568B) on each unit. **Full colour/pin map:
+  `docs/wiring.md`.** Never plug either jack into a network switch (PoE).
 - Probe placement (confirmed by Eddie): **STOVE** channel (CS GPIO10) is on the
   flue pipe just above the stove collar; **FLUE** channel (CS GPIO14) is at the top
   of the chimney, just outside the pipe. Double-wall pipe; Eddie verified little
