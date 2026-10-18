@@ -22,7 +22,7 @@ All entity IDs start with `stove_monitor_`.
 
 | Kind | Entities |
 |---|---|
-| Sensors | Stove / Flue temperature, Stove / Flue rate (°F/min), Outside temperature, Alarm level (none, reload, warning, fault, critical), Stove / Flue alarm (none, warning, critical), Silence time left |
+| Sensors | Stove / Flue temperature, Stove / Flue rate (°F/min), Outside temperature, Burn zone (Too cool, Ideal burn, Running hot, Chimney too cool), Alarm level (none, reload, warning, fault, critical), Stove / Flue alarm (none, warning, critical), Silence time left |
 | Binary sensors | Possible chimney fire, Stove / Flue probe fault, Reload needed, Ideal burn, Alarm silenced, Buzzer sounding |
 | Switches | Reload alert, Quiet mode, Ideal burn indicator, Screen shows °C, Flip screen |
 | Numbers | Stove / Flue warning and critical, Chimney fire rise rate, Chimney fire check above, Reload temperature, Hysteresis, Ideal stove from / to, Ideal chimney exit at least, Silence warnings for, Silence critical for, Screen brightness |

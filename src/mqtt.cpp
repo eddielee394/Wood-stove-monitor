@@ -113,6 +113,18 @@ const char* levelSlug(state::Level l) {
 
 const char* onOff(bool b) { return b ? "ON" : "OFF"; }
 
+// Burn zone, decided exactly as on the touchscreen (dashboard.cpp updateZone).
+const char* burnZone(const state::Snapshot& s, const settings::Settings& cfg) {
+  const state::Channel& st = s.ch[thermo::STOVE];
+  const state::Channel& fl = s.ch[thermo::FLUE];
+  if (!st.valid) return "No stove reading";
+  if (s.alarms.ideal) return "Ideal burn";
+  if (st.tempF < cfg.idealLoF) return "Too cool";
+  if (st.tempF > cfg.idealHiF) return "Running hot";
+  if (fl.valid && fl.tempF < cfg.idealExitF) return "Chimney too cool";
+  return "Ideal burn";  // inside the deadband while the flag settles
+}
+
 bool publishJson(const char* topic, const JsonDocument& d, bool retain) {
   static char buf[BUFFER - 160];  // leave room for the topic and header
   size_t n = measureJson(d);
@@ -233,6 +245,8 @@ void announceAll() {
   sensor("outside_temp", "Outside temperature", "outside", "°F", "temperature", nullptr, true);
   enumSensor("alarm_level", "Alarm level", "alarm.level", "mdi:alarm-light",
              {"none", "reload", "warning", "fault", "critical"});
+  enumSensor("burn_zone", "Burn zone", "zone", "mdi:fire",
+             {"Too cool", "Ideal burn", "Running hot", "Chimney too cool", "No stove reading"});
   enumSensor("stove_alarm", "Stove alarm", "alarm.stove", "mdi:thermometer-alert",
              {"none", "warning", "critical"});
   enumSensor("flue_alarm", "Flue alarm", "alarm.flue", "mdi:thermometer-alert",
@@ -334,6 +348,7 @@ void publishState() {
     addNumber(c["rate"], s.ch[i].valid ? s.ch[i].rateFpm : NAN, 0);  // whole °F/min, like the screen
   }
   addNumber(d["outside"], w.valid ? w.tempF : NAN);
+  d["zone"] = burnZone(s, settings::get());
   const state::Alarms& a = s.alarms;
   JsonObject al = d["alarm"].to<JsonObject>();
   al["level"] = levelSlug(a.highest);

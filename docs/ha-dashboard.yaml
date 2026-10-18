@@ -140,10 +140,67 @@ views:
           - type: tile
             entity: sensor.stove_monitor_outside_temperature
             name: Outside
-          - type: tile
-            entity: binary_sensor.stove_monitor_ideal_burn
-            name: Ideal burn
-            color: green
+          # Burn zone, as on the touchscreen: one tile per zone so each
+          # has its own colour; only the current one shows.
+          - type: vertical-stack
+            cards:
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: sensor.stove_monitor_burn_zone
+                    state: Too cool
+                card:
+                  type: tile
+                  entity: sensor.stove_monitor_burn_zone
+                  name: Burn zone
+                  icon: mdi:snowflake-thermometer
+                  color: blue
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: sensor.stove_monitor_burn_zone
+                    state: Ideal burn
+                card:
+                  type: tile
+                  entity: sensor.stove_monitor_burn_zone
+                  name: Burn zone
+                  icon: mdi:fire
+                  color: green
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: sensor.stove_monitor_burn_zone
+                    state: Running hot
+                card:
+                  type: tile
+                  entity: sensor.stove_monitor_burn_zone
+                  name: Burn zone
+                  icon: mdi:fire-alert
+                  color: amber
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: sensor.stove_monitor_burn_zone
+                    state: Chimney too cool
+                card:
+                  type: tile
+                  entity: sensor.stove_monitor_burn_zone
+                  name: Burn zone
+                  icon: mdi:alert
+                  color: amber
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: sensor.stove_monitor_burn_zone
+                    state: No stove reading
+                card:
+                  type: tile
+                  entity: sensor.stove_monitor_burn_zone
+                  name: Burn zone
+                  icon: mdi:help-circle-outline
+                  color: disabled
+            grid_options:
+              columns: 6
 
       - type: grid
         cards:
