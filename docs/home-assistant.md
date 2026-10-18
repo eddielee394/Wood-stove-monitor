@@ -211,66 +211,18 @@ actions:
 
 ## Dashboard
 
-Edit the dashboard, add a card, choose **Manual**, and paste:
+The full dashboard is `docs/ha-dashboard.yaml`. It has three views: Stove
+(alarm banner, gauges, 6-hour graph, quick controls), Settings (every
+setting) and History (24 h, 7 days, alarm log, monitor health). To install
+or update it:
 
-```yaml
-type: vertical-stack
-cards:
-  - type: horizontal-stack
-    cards:
-      - type: tile
-        entity: sensor.stove_monitor_stove_temperature
-        name: Stove
-      - type: tile
-        entity: sensor.stove_monitor_flue_temperature
-        name: Flue
-      - type: tile
-        entity: sensor.stove_monitor_outside_temperature
-        name: Outside
-  - type: entities
-    entities:
-      - entity: sensor.stove_monitor_alarm_level
-      - entity: binary_sensor.stove_monitor_ideal_burn
-      - entity: sensor.stove_monitor_stove_rate
-      - entity: sensor.stove_monitor_flue_rate
-      - entity: button.stove_monitor_silence_alarm
-      - entity: switch.stove_monitor_quiet_mode
-      - entity: switch.stove_monitor_reload_alert
-      - entity: number.stove_monitor_reload_temperature
-  - type: history-graph
-    title: Last 6 hours
-    hours_to_show: 6
-    entities:
-      - entity: sensor.stove_monitor_stove_temperature
-      - entity: sensor.stove_monitor_flue_temperature
-      - entity: sensor.stove_monitor_outside_temperature
-  - type: entities
-    title: Alarm thresholds
-    state_color: false
-    entities:
-      - number.stove_monitor_stove_warning
-      - number.stove_monitor_stove_critical
-      - number.stove_monitor_flue_warning
-      - number.stove_monitor_flue_critical
-      - number.stove_monitor_chimney_fire_rise_rate
-      - number.stove_monitor_chimney_fire_check_above
-      - number.stove_monitor_hysteresis
-      - number.stove_monitor_silence_warnings_for
-      - number.stove_monitor_silence_critical_for
-  - type: entities
-    title: Ideal burn and screen
-    entities:
-      - switch.stove_monitor_ideal_burn_indicator
-      - number.stove_monitor_ideal_stove_from
-      - number.stove_monitor_ideal_stove_to
-      - number.stove_monitor_ideal_chimney_exit_at_least
-      - number.stove_monitor_screen_brightness
-      - switch.stove_monitor_screen_shows_c
-      - switch.stove_monitor_flip_screen
-```
+1. Settings → Dashboards → Add dashboard → New dashboard from scratch,
+   named "Stove", icon `mdi:fireplace` (first time only).
+2. Open it, then pencil (Edit) → ⋮ → Raw configuration editor.
+3. Replace everything with the contents of `docs/ha-dashboard.yaml` and save.
 
 ## Adding a setting later
 
 Every new monitor setting must also appear here (see CLAUDE.md, "Home
-Assistant"). Add it to `SETTINGS` in `src/mqtt.cpp` and to the dashboard
-above. Don't add it to the device web page.
+Assistant"). Add it to `SETTINGS` in `src/mqtt.cpp` and to
+`docs/ha-dashboard.yaml`. Don't add it to the device web page.

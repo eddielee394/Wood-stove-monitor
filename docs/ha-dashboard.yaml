@@ -1,0 +1,387 @@
+# Stove dashboard for Home Assistant. Paste the whole file into a new
+# dashboard: Edit (pencil) -> ⋮ -> Raw configuration editor -> replace all.
+# Keep this file in step with the firmware: every setting the monitor has
+# appears on the Settings view (see CLAUDE.md, "Home Assistant").
+#
+# Gauge colours are fixed numbers (HA's gauge card can't read them from an
+# entity). They match the thresholds set on 2026-10-17:
+#   STOVE warning 850, critical 1000; ideal 300-550
+#   FLUE  warning 775, critical 850;  chimney exit ideal >= 250
+# Update the segments below if the thresholds change.
+
+title: Stove
+views:
+  # ---------------------------------------------------------------- Stove
+  - title: Stove
+    path: stove
+    icon: mdi:fireplace
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Now
+            heading_style: title
+            icon: mdi:fireplace
+
+          # Alarm banner: only shown while something needs attention.
+          - type: markdown
+            visibility:
+              - condition: state
+                entity: sensor.stove_monitor_alarm_level
+                state_not: none
+            content: >-
+              {% set lvl = states('sensor.stove_monitor_alarm_level') %}
+              {% set st = states('sensor.stove_monitor_stove_temperature') %}
+              {% set fl = states('sensor.stove_monitor_flue_temperature') %}
+              {% if is_state('binary_sensor.stove_monitor_possible_chimney_fire', 'on') %}
+              ## 🔥 POSSIBLE CHIMNEY FIRE
+
+              Flue rising {{ states('sensor.stove_monitor_flue_rate') | int(0) }}°F/min.
+              **Close the door and air control. Get everyone out. Call 911.**
+              {% elif lvl == 'critical' %}
+              ## 🚨 {{ 'FLUE' if is_state('sensor.stove_monitor_flue_alarm', 'critical') else 'STOVE' }} CRITICAL
+
+              Stove {{ st | int(0) }}°F · Flue {{ fl | int(0) }}°F
+              {% elif lvl == 'warning' %}
+              ## ⚠️ {{ 'Flue' if is_state('sensor.stove_monitor_flue_alarm', 'warning') else 'Stove' }} warning
+
+              Stove {{ st | int(0) }}°F · Flue {{ fl | int(0) }}°F
+              {% elif lvl == 'fault' %}
+              ## ⚠️ Probe fault
+
+              {{ 'Stove' if is_state('binary_sensor.stove_monitor_stove_probe_fault', 'on') else 'Flue' }}
+              probe has no reading. Check the probe and the sensor box.
+              {% elif lvl == 'reload' %}
+              ## 🪵 Time to reload
+
+              Stove has cooled to {{ st | int(0) }}°F.
+              {% else %}
+              ## 📡 Monitor offline
+
+              Home Assistant can't reach the stove monitor. Its own alarms still work.
+              {% endif %}
+              {% if is_state('binary_sensor.stove_monitor_alarm_silenced', 'on') %}
+
+              🔕 Silenced · returns in
+              {{ (states('sensor.stove_monitor_silence_time_left') | int(0) / 60) | round(0, 'ceil') | int }} min
+              {% endif %}
+
+          - type: button
+            name: Silence alarm
+            icon: mdi:volume-off
+            show_state: false
+            visibility:
+              - condition: state
+                entity: sensor.stove_monitor_alarm_level
+                state_not: none
+              - condition: state
+                entity: sensor.stove_monitor_alarm_level
+                state_not: unavailable
+              - condition: state
+                entity: binary_sensor.stove_monitor_alarm_silenced
+                state: "off"
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.stove_monitor_silence_alarm
+            grid_options:
+              columns: 12
+              rows: 1
+
+          - type: gauge
+            entity: sensor.stove_monitor_stove_temperature
+            name: Stove
+            min: 0
+            max: 1200
+            needle: true
+            segments:
+              - from: 0
+                color: "#8DBDF0"
+                label: Too cool
+              - from: 300
+                color: "#4FD18B"
+                label: Ideal
+              - from: 550
+                color: "#9FB2C8"
+                label: Hot
+              - from: 850
+                color: "#F29A1F"
+                label: Warning
+              - from: 1000
+                color: "#E0304E"
+                label: Critical
+            grid_options:
+              columns: 6
+
+          - type: gauge
+            entity: sensor.stove_monitor_flue_temperature
+            name: Flue
+            min: 0
+            max: 1000
+            needle: true
+            segments:
+              - from: 0
+                color: "#F5B547"
+                label: Creosote risk
+              - from: 250
+                color: "#4FD18B"
+                label: Good
+              - from: 775
+                color: "#F29A1F"
+                label: Warning
+              - from: 850
+                color: "#E0304E"
+                label: Critical
+            grid_options:
+              columns: 6
+
+          - type: tile
+            entity: sensor.stove_monitor_stove_rate
+            name: Stove rate
+            icon: mdi:chart-line
+          - type: tile
+            entity: sensor.stove_monitor_flue_rate
+            name: Flue rate
+            icon: mdi:chart-line
+          - type: tile
+            entity: sensor.stove_monitor_outside_temperature
+            name: Outside
+          - type: tile
+            entity: binary_sensor.stove_monitor_ideal_burn
+            name: Ideal burn
+            color: green
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Last 6 hours
+            icon: mdi:chart-bell-curve-cumulative
+          - type: history-graph
+            hours_to_show: 6
+            entities:
+              - entity: sensor.stove_monitor_stove_temperature
+                name: Stove
+              - entity: sensor.stove_monitor_flue_temperature
+                name: Flue
+              - entity: sensor.stove_monitor_outside_temperature
+                name: Outside
+            grid_options:
+              columns: 12
+              rows: 5
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Quick controls
+            icon: mdi:tune-variant
+          - type: tile
+            entity: switch.stove_monitor_quiet_mode
+            name: Quiet mode
+            features_position: inline
+            features:
+              - type: toggle
+          - type: tile
+            entity: switch.stove_monitor_reload_alert
+            name: Reload alert
+            features_position: inline
+            features:
+              - type: toggle
+          - type: tile
+            entity: number.stove_monitor_reload_temperature
+            name: Reload below
+            grid_options:
+              columns: 12
+            features:
+              - type: numeric-input
+                style: buttons
+          - type: tile
+            entity: number.stove_monitor_screen_brightness
+            name: Screen brightness
+            grid_options:
+              columns: 12
+            features:
+              - type: numeric-input
+                style: slider
+
+  # ------------------------------------------------------------- Settings
+  # Every monitor setting, grouped like the touchscreen tabs.
+  - title: Settings
+    path: settings
+    icon: mdi:cog
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Stove
+            icon: mdi:fireplace
+          - type: entities
+            entities:
+              - entity: number.stove_monitor_stove_warning
+                name: Warning at
+              - entity: number.stove_monitor_stove_critical
+                name: Critical at
+            grid_options:
+              columns: 12
+
+          - type: heading
+            heading: Flue and chimney fire
+            icon: mdi:fire-alert
+          - type: entities
+            entities:
+              - entity: number.stove_monitor_flue_warning
+                name: Warning at
+              - entity: number.stove_monitor_flue_critical
+                name: Critical at
+              - entity: number.stove_monitor_chimney_fire_rise_rate
+                name: Chimney fire if rising faster than
+              - entity: number.stove_monitor_chimney_fire_check_above
+                name: …only once the flue is above
+            grid_options:
+              columns: 12
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Alerts
+            icon: mdi:bell-ring
+          - type: entities
+            entities:
+              - entity: switch.stove_monitor_reload_alert
+              - entity: number.stove_monitor_reload_temperature
+                name: Reload below
+              - entity: switch.stove_monitor_quiet_mode
+                name: Quiet mode (Critical and faults always sound)
+              - entity: number.stove_monitor_silence_warnings_for
+              - entity: number.stove_monitor_silence_critical_for
+              - entity: number.stove_monitor_hysteresis
+                name: Hysteresis (alarms clear this far below)
+            grid_options:
+              columns: 12
+
+          - type: heading
+            heading: Ideal burn
+            icon: mdi:fire
+          - type: entities
+            entities:
+              - entity: switch.stove_monitor_ideal_burn_indicator
+                name: Show indicator
+              - entity: number.stove_monitor_ideal_stove_from
+                name: Stove from
+              - entity: number.stove_monitor_ideal_stove_to
+                name: Stove to
+              - entity: number.stove_monitor_ideal_chimney_exit_at_least
+                name: Chimney exit at least
+            grid_options:
+              columns: 12
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Screen
+            icon: mdi:monitor
+          - type: entities
+            entities:
+              - entity: number.stove_monitor_screen_brightness
+                name: Brightness
+              - entity: switch.stove_monitor_screen_shows_c
+                name: Show °C
+              - entity: switch.stove_monitor_flip_screen
+                name: Flip screen (upside-down mount)
+            grid_options:
+              columns: 12
+          - type: markdown
+            content: >-
+              Changes are checked by the monitor, the same as on its
+              touchscreen. If one is refused, the control snaps back and the
+              reason is shown here:
+              **{{ states('sensor.stove_monitor_last_rejected_setting') }}**
+
+  # ---------------------------------------------------- History and health
+  - title: History
+    path: history
+    icon: mdi:chart-line
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Last 24 hours
+          - type: history-graph
+            hours_to_show: 24
+            entities:
+              - entity: sensor.stove_monitor_stove_temperature
+                name: Stove
+              - entity: sensor.stove_monitor_flue_temperature
+                name: Flue
+              - entity: sensor.stove_monitor_outside_temperature
+                name: Outside
+            grid_options:
+              columns: 12
+              rows: 5
+          - type: history-graph
+            title: Rates (°F/min)
+            hours_to_show: 24
+            entities:
+              - entity: sensor.stove_monitor_stove_rate
+                name: Stove
+              - entity: sensor.stove_monitor_flue_rate
+                name: Flue
+            grid_options:
+              columns: 12
+              rows: 4
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Last 7 days
+          - type: statistics-graph
+            title: Hourly average and peak
+            days_to_show: 7
+            period: hour
+            chart_type: line
+            stat_types:
+              - mean
+              - max
+            entities:
+              - entity: sensor.stove_monitor_stove_temperature
+                name: Stove
+              - entity: sensor.stove_monitor_flue_temperature
+                name: Flue
+            grid_options:
+              columns: 12
+              rows: 5
+          - type: logbook
+            title: Alarm log
+            hours_to_show: 168
+            target:
+              entity_id:
+                - sensor.stove_monitor_alarm_level
+                - binary_sensor.stove_monitor_possible_chimney_fire
+                - binary_sensor.stove_monitor_stove_probe_fault
+                - binary_sensor.stove_monitor_flue_probe_fault
+                - binary_sensor.stove_monitor_reload_needed
+                - binary_sensor.stove_monitor_alarm_silenced
+            grid_options:
+              columns: 12
+              rows: 5
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Monitor health
+            icon: mdi:heart-pulse
+          - type: entities
+            entities:
+              - entity: sensor.stove_monitor_wi_fi_signal
+              - entity: sensor.stove_monitor_uptime
+              - entity: sensor.stove_monitor_last_restart_reason
+              - entity: sensor.stove_monitor_last_rejected_setting
+              - entity: binary_sensor.stove_monitor_buzzer_sounding
+            grid_options:
+              columns: 12

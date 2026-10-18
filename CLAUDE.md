@@ -298,7 +298,7 @@ moon/sun icons are reserved for weather and time.
 Every setting the monitor has is exposed in HA. **Any new or changed setting
 or configuration goes into the HA integration as part of the same change:**
 add it to `SETTINGS` in `src/mqtt.cpp` (switch for 0/1, number otherwise) and
-to the dashboard/automation YAML in `docs/home-assistant.md`. **Do not add
+to `docs/ha-dashboard.yaml` (and the automations in `docs/home-assistant.md` if it needs an alert). **Do not add
 features to the device web page any more.** It stays as a LAN fallback and as
 the one place to enter the MQTT broker, which has to be set before HA can
 reach the monitor. The touchscreen keeps working on its own (safety and Wi-Fi
