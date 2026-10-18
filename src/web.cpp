@@ -151,6 +151,7 @@ void handleStatus() {
   j.boolean("has_pass", m.hasPass);  // never the password itself
   j.str("error", m.error);
   j.integer("retry_in", m.retryInS);
+  j.integer("sent", m.stateSent);
   j.close('}');
   j.str("version", version::get());
   j.integer("uptime", millis() / 1000);

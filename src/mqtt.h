@@ -20,6 +20,7 @@ struct Status {
   bool hasPass;
   char error[48];      // last connection error, "" once connected
   uint32_t retryInS;   // seconds until the next attempt when Failed
+  uint32_t stateSent;  // state messages published since boot
 };
 
 void start();

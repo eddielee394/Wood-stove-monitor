@@ -27,6 +27,7 @@ const char* T_SET = "stove-monitor/set/";        // + setting key
 const char* T_SILENCE = "stove-monitor/silence";
 const char* T_HA_STATUS = "homeassistant/status";  // HA's birth message
 const uint32_t STATE_EVERY_MS = 10000;
+const uint32_t STATE_MIN_GAP_MS = 1000;
 const uint32_t BACKOFF_MIN_MS = 5000, BACKOFF_MAX_MS = 60000;
 const uint16_t BUFFER = 2048;
 
@@ -261,6 +262,8 @@ void announceAll() {
 // ---- state
 
 // What changing should publish at once rather than on the 10s tick.
+// Compared field by field: memcmp would also compare padding bytes, which
+// copies don't preserve, and turn every check into a "change".
 struct Sig {
   state::Level temp[thermo::COUNT];
   bool fault[thermo::COUNT];
@@ -269,9 +272,23 @@ struct Sig {
   settings::Settings cfg;
 };
 
+// Settings is all int32_t, so it has no padding and memcmp is exact.
+static_assert(sizeof(settings::Settings) % sizeof(int32_t) == 0, "Settings must stay int32_t only");
+bool sameSettings(const settings::Settings& a, const settings::Settings& b) {
+  return memcmp(&a, &b, sizeof(a)) == 0;
+}
+
+bool operator==(const Sig& a, const Sig& b) {
+  for (int i = 0; i < thermo::COUNT; i++) {
+    if (a.temp[i] != b.temp[i] || a.fault[i] != b.fault[i]) return false;
+  }
+  return a.rateHigh == b.rateHigh && a.reload == b.reload && a.ideal == b.ideal &&
+         a.silenced == b.silenced && a.audible == b.audible && a.highest == b.highest &&
+         sameSettings(a.cfg, b.cfg);
+}
+
 Sig signature() {
-  Sig g;
-  memset(&g, 0, sizeof(g));  // padding too, for memcmp
+  Sig g = {};
   state::Alarms a = state::get().alarms;
   for (int i = 0; i < thermo::COUNT; i++) {
     g.temp[i] = a.temp[i];
@@ -287,9 +304,12 @@ Sig signature() {
   return g;
 }
 
-void addNumber(JsonVariant v, float f) {
-  if (isnan(f)) v.set(nullptr);
-  else v.set(serialized(String(f, 1)));
+// Takes the member proxy itself: converting a missing member to JsonVariant
+// gives an unbound variant, and setting that silently does nothing.
+template <typename Slot>
+void addNumber(Slot&& slot, float f) {
+  if (isnan(f)) slot = nullptr;
+  else slot = serialized(String(f, 1));
 }
 
 void publishState() {
@@ -325,7 +345,11 @@ void publishState() {
   d["uptime"] = millis() / 1000;
   d["reset"] = state::resetReason();
   d["rejected"] = rejected[0] ? rejected : "none";
-  publishJson(T_STATE, d, false);
+  if (publishJson(T_STATE, d, false)) {
+    xSemaphoreTake(lock, portMAX_DELAY);
+    st.stateSent++;
+    xSemaphoreGive(lock);
+  }
 }
 
 // ---- commands
@@ -457,8 +481,10 @@ void task(void*) {
         announceAll();
       }
       Sig now_sig = signature();
-      if (sendState || memcmp(&now_sig, &last, sizeof(Sig)) ||
-          millis() - lastState >= STATE_EVERY_MS) {
+      uint32_t since = millis() - lastState;
+      // Never more than one state message a second, whatever changes.
+      if (since >= STATE_MIN_GAP_MS &&
+          (sendState || !(now_sig == last) || since >= STATE_EVERY_MS)) {
         sendState = false;
         last = now_sig;
         lastState = millis();
