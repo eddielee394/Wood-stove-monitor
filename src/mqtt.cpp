@@ -163,7 +163,29 @@ void valueTemplate(JsonDocument& d, const char* path) {
   d["value_template"] = vt;
 }
 
-void announce(const char* component, const char* key, const JsonDocument& d) {
+// "<component>.stove_monitor_<name as a slug>", the ID HA would pick for a
+// device with no area. Without it, entities discovered after the device was
+// put in an area get the area prefixed (sensor.living_room_stove_monitor_...).
+void defaultEntityId(const char* component, JsonDocument& d) {
+  char id[96];
+  int n = snprintf(id, sizeof(id), "%s.stove_monitor_", component);
+  bool sep = false;
+  for (const char* p = d["name"] | ""; *p && n < (int)sizeof(id) - 2; p++) {
+    char ch = *p;
+    if (isalnum((unsigned char)ch)) {
+      if (sep && id[n - 1] != '_') id[n++] = '_';
+      id[n++] = tolower((unsigned char)ch);
+      sep = false;
+    } else {
+      sep = true;  // spaces, punctuation and UTF-8 (°, …) become one '_'
+    }
+  }
+  id[n] = '\0';
+  d["default_entity_id"] = id;
+}
+
+void announce(const char* component, const char* key, JsonDocument& d) {
+  defaultEntityId(component, d);
   char topic[96];
   snprintf(topic, sizeof(topic), "homeassistant/%s/%s/%s/config", component, devId, key);
   publishJson(topic, d, true);
