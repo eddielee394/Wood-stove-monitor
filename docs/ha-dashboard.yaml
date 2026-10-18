@@ -91,26 +91,6 @@ views:
               columns: 12
               rows: 1
 
-          # Big readouts, like the monitor's screen, with a 2-hour trend line.
-          - type: sensor
-            entity: sensor.stove_monitor_stove_temperature
-            name: Stove
-            icon: mdi:fireplace
-            graph: line
-            hours_to_show: 2
-            detail: 2
-            grid_options:
-              columns: 6
-          - type: sensor
-            entity: sensor.stove_monitor_flue_temperature
-            name: Flue
-            icon: mdi:chimney
-            graph: line
-            hours_to_show: 2
-            detail: 2
-            grid_options:
-              columns: 6
-
           - type: gauge
             entity: sensor.stove_monitor_stove_temperature
             name: Stove
