@@ -38,4 +38,10 @@ std::vector<Network> scanResults();  // strongest first, duplicates merged
 void connect(const char* ssid, const char* password);  // saves on success path
 void forget();                                         // clears credentials
 
+// Memory-heavy network work (the weather TLS fetch, the MQTT connect and
+// discovery burst) takes turns under this lock: run together at boot they
+// exhausted internal RAM and took Wi-Fi down. Blocks until free.
+void heavyBegin();
+void heavyEnd();
+
 }  // namespace net

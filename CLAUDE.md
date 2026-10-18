@@ -316,6 +316,14 @@ setup must not depend on HA).
   or a number) and `stove-monitor/silence` (`PRESS`). Discovery is sent
   retained to `homeassistant/<component>/stove_monitor_<mac>/<key>/config` on
   connect and again when HA publishes `online` on `homeassistant/status`.
+- Memory: internal RAM is tight (~56 KB free in normal running, as low as
+  ~13 KB during the boot-time weather TLS fetch). The weather fetch and the
+  MQTT connect/discovery burst take turns under `net::heavyBegin/End`. MQTT
+  waits for 20s uptime and 40 KB free before connecting, and discovery is
+  paced 25ms per config. Without that, a reboot with the broker up exhausted
+  RAM and killed Wi-Fi for good (2026-10-17). State messages are capped at
+  1/s. `main.cpp` restarts the board if internal RAM stays under 8 KB for 60s
+  (reset reason "low memory restart").
 - Commands go through `settings::setByName`, the same validated setter as the
   touchscreen. A rejected value snaps HA back to the real value and shows in
   the "Last rejected setting" diagnostic sensor.

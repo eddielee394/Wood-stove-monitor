@@ -118,7 +118,10 @@ void task(void*) {
     xSemaphoreGive(lock);
     if (!located || net::status().link != net::Link::Connected) continue;
     if ((int32_t)(now - nextAt) < 0) continue;
-    if (fetch(lat, lon)) {
+    net::heavyBegin();
+    bool ok = fetch(lat, lon);
+    net::heavyEnd();
+    if (ok) {
       nextAt = millis() + REFRESH_MS;
       retry = RETRY_MIN_MS;
     } else {

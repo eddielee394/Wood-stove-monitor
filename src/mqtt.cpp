@@ -5,6 +5,7 @@
 #include <Preferences.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <esp_heap_caps.h>
 #include <esp_system.h>
 #include <freertos/semphr.h>
 
@@ -30,6 +31,9 @@ const uint32_t STATE_EVERY_MS = 10000;
 const uint32_t STATE_MIN_GAP_MS = 1000;
 const uint32_t BACKOFF_MIN_MS = 5000, BACKOFF_MAX_MS = 60000;
 const uint16_t BUFFER = 2048;
+const uint32_t CONNECT_AFTER_MS = 20000;     // let boot (and its weather fetch) settle
+const size_t CONNECT_MIN_HEAP = 40000;       // internal RAM free before connecting
+const uint32_t DISCOVERY_GAP_MS = 25;        // pace the discovery burst
 
 SemaphoreHandle_t lock;
 Status st;
@@ -151,6 +155,8 @@ void announce(const char* component, const char* key, const JsonDocument& d) {
   char topic[96];
   snprintf(topic, sizeof(topic), "homeassistant/%s/%s/%s/config", component, devId, key);
   publishJson(topic, d, true);
+  client.loop();
+  vTaskDelay(pdMS_TO_TICKS(DISCOVERY_GAP_MS));
 }
 
 void sensor(const char* key, const char* name, const char* path, const char* unit,
@@ -307,9 +313,14 @@ Sig signature() {
 // Takes the member proxy itself: converting a missing member to JsonVariant
 // gives an unbound variant, and setting that silently does nothing.
 template <typename Slot>
-void addNumber(Slot&& slot, float f) {
-  if (isnan(f)) slot = nullptr;
-  else slot = serialized(String(f, 1));
+void addNumber(Slot&& slot, float f, int decimals = 1) {
+  if (isnan(f)) {
+    slot = nullptr;
+    return;
+  }
+  float p = decimals ? 10.0f : 1.0f;
+  f = roundf(f * p) / p + 0.0f;  // + 0.0f turns -0 into 0
+  slot = serialized(String(f, decimals));
 }
 
 void publishState() {
@@ -320,7 +331,7 @@ void publishState() {
   for (int i = 0; i < thermo::COUNT; i++) {
     JsonObject c = d[names[i]].to<JsonObject>();
     addNumber(c["temp"], s.ch[i].valid ? s.ch[i].tempF : NAN);
-    addNumber(c["rate"], s.ch[i].valid ? s.ch[i].rateFpm : NAN);
+    addNumber(c["rate"], s.ch[i].valid ? s.ch[i].rateFpm : NAN, 0);  // whole °F/min, like the screen
   }
   addNumber(d["outside"], w.valid ? w.tempF : NAN);
   const state::Alarms& a = s.alarms;
@@ -450,7 +461,8 @@ void task(void*) {
         Serial.printf("mqtt: %s\n", stateError(client.state()));
         setConn(Conn::Failed, stateError(client.state()));
         nextTry = now + 1000;  // quick first retry after a drop
-      } else if ((int32_t)(now - nextTry) >= 0) {
+      } else if ((int32_t)(now - nextTry) >= 0 && now >= CONNECT_AFTER_MS &&
+                 heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= CONNECT_MIN_HEAP) {
         char user[65], pw[65];
         uint16_t port;
         xSemaphoreTake(lock, portMAX_DELAY);
@@ -460,8 +472,14 @@ void task(void*) {
         port = st.port;
         xSemaphoreGive(lock);
         setConn(Conn::Connecting);
+        net::heavyBegin();
         bool ok = tryConnect(port, user, pw);
         memset(pw, 0, sizeof(pw));
+        if (ok) {
+          announceAll();  // the burst, while holding the heavy lock
+          sendDiscovery = false;
+        }
+        net::heavyEnd();
         if (ok) {
           Serial.println("mqtt: connected");
           setConn(Conn::Connected, "");
@@ -476,9 +494,11 @@ void task(void*) {
       }
     } else {
       client.loop();
-      if (sendDiscovery) {
+      if (sendDiscovery) {  // HA restarted
         sendDiscovery = false;
+        net::heavyBegin();
         announceAll();
+        net::heavyEnd();
       }
       Sig now_sig = signature();
       uint32_t since = millis() - lastState;

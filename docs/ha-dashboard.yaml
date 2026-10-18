@@ -100,19 +100,14 @@ views:
             segments:
               - from: 0
                 color: "#8DBDF0"
-                label: Too cool
               - from: 300
                 color: "#4FD18B"
-                label: Ideal
               - from: 550
                 color: "#9FB2C8"
-                label: Hot
               - from: 850
                 color: "#F29A1F"
-                label: Warning
               - from: 1000
                 color: "#E0304E"
-                label: Critical
             grid_options:
               columns: 6
 
@@ -125,16 +120,12 @@ views:
             segments:
               - from: 0
                 color: "#F5B547"
-                label: Creosote risk
               - from: 250
                 color: "#4FD18B"
-                label: Good
               - from: 775
                 color: "#F29A1F"
-                label: Warning
               - from: 850
                 color: "#E0304E"
-                label: Critical
             grid_options:
               columns: 6
 

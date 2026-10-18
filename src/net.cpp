@@ -17,6 +17,7 @@ const uint32_t CONNECT_TIMEOUT_MS = 20000;
 const uint32_t BACKOFF_MIN_MS = 5000, BACKOFF_MAX_MS = 60000;
 
 SemaphoreHandle_t lock;
+SemaphoreHandle_t heavy;
 Status st;
 std::vector<Network> results;
 bool scanRequested = false, scanBusy = false;
@@ -185,8 +186,12 @@ void task(void*) {
 
 }  // namespace
 
+void heavyBegin() { xSemaphoreTake(heavy, portMAX_DELAY); }
+void heavyEnd() { xSemaphoreGive(heavy); }
+
 void start() {
   lock = xSemaphoreCreateMutex();
+  heavy = xSemaphoreCreateMutex();
   st = {};
   xTaskCreatePinnedToCore(task, "net", 6144, nullptr, 2, nullptr, 0);
 }

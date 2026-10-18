@@ -3,6 +3,7 @@
 // loop, which runs the LVGL UI and the serial console.
 
 #include <Arduino.h>
+#include <esp_heap_caps.h>
 #include <esp_task_wdt.h>
 
 #include "alarms.h"
@@ -21,6 +22,23 @@
 LGFX tft;
 
 static const uint32_t WDT_TIMEOUT_S = 10;
+static const size_t LOW_HEAP = 8000;            // internal RAM bytes
+static const uint32_t LOW_HEAP_RESTART_MS = 60000;
+
+// If internal RAM stays nearly exhausted, Wi-Fi can stop working for good
+// while everything else runs on. Restart (a few seconds; the alarms come
+// straight back) rather than sit unreachable until someone unplugs it.
+static void memoryGuard() {
+  static uint32_t lowSince = 0;
+  if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= LOW_HEAP) {
+    lowSince = 0;
+  } else if (!lowSince) {
+    lowSince = millis() | 1;
+  } else if (millis() - lowSince > LOW_HEAP_RESTART_MS) {
+    Serial.println("memory: internal RAM exhausted for 60s, restarting");
+    state::restartLowMemory();
+  }
+}
 
 void setup() {
   buzzer::begin();  // pin held quiet before anything else
@@ -48,5 +66,6 @@ void setup() {
 void loop() {
   console::poll();
   ui::loop();
+  memoryGuard();
   delay(5);
 }

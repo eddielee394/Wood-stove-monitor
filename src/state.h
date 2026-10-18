@@ -56,5 +56,8 @@ bool benchMuteFaults();
 
 const char* levelName(Level l);
 const char* resetReason();  // why the board last restarted
+// Restart on purpose because internal RAM ran out (network stuck); shows
+// as "low memory restart" after the reboot.
+void restartLowMemory();
 
 }  // namespace state
