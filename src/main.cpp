@@ -9,6 +9,7 @@
 #include "buzzer.h"
 #include "console.h"
 #include "display.h"
+#include "mqtt.h"
 #include "net.h"
 #include "sensors.h"
 #include "settings.h"
@@ -36,6 +37,7 @@ void setup() {
   alarms::start();
   net::start();  // after the safety tasks; nothing depends on it
   weather::start();
+  mqtt::start();
 
   tft.init();
   tft.setRotation(1);  // landscape, 480x320

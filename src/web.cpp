@@ -6,6 +6,7 @@
 #include <esp_heap_caps.h>
 #include <libb64/cdecode.h>
 
+#include "mqtt.h"
 #include "net.h"
 #include "ota.h"
 #include "settings.h"
@@ -141,6 +142,16 @@ void handleStatus() {
   j.num("lat", w.lat, 4);
   j.num("lon", w.lon, 4);
   j.close('}');
+  mqtt::Status m = mqtt::status();
+  j.open("mqtt", '{');
+  j.str("state", mqtt::connName(m.conn));
+  j.str("host", m.host);
+  j.integer("port", m.port);
+  j.str("user", m.user);
+  j.boolean("has_pass", m.hasPass);  // never the password itself
+  j.str("error", m.error);
+  j.integer("retry_in", m.retryInS);
+  j.close('}');
   j.str("version", version::get());
   j.integer("uptime", millis() / 1000);
   j.integer("heap_internal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
@@ -199,6 +210,24 @@ void handleLocation() {
                  : "{\"ok\":false,\"error\":\"latitude -90 to 90, longitude -180 to 180\"}");
 }
 
+// host=..&port=..&user=..&pass=.. sets the Home Assistant broker (an empty
+// pass keeps the saved one); an empty host turns MQTT off.
+void handleMqtt() {
+  String host = server.arg("host"), user = server.arg("user"), pass = server.arg("pass");
+  host.trim();
+  user.trim();
+  bool ok;
+  if (host.isEmpty()) {
+    mqtt::clear();
+    ok = true;
+  } else {
+    long port = server.arg("port").isEmpty() ? 1883 : server.arg("port").toInt();
+    ok = port > 0 && port < 65536 && mqtt::configure(host.c_str(), port, user.c_str(), pass.c_str());
+  }
+  server.send(ok ? 200 : 400, "application/json",
+              ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"check the address and port\"}");
+}
+
 bool uploadAllowed = false;
 
 // HTTP Basic auth "ota:<password>", checked against NVS.
@@ -250,6 +279,7 @@ void begin() {
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/settings", HTTP_POST, handleSettings);
   server.on("/api/location", HTTP_POST, handleLocation);
+  server.on("/api/mqtt", HTTP_POST, handleMqtt);
   server.on("/api/silence", HTTP_POST, []() {
     state::requestSilence();
     server.send(200, "application/json", "{\"ok\":true}");

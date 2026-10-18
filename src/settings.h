@@ -45,6 +45,8 @@ bool setByName(const char* key, long value, char* err, size_t errLen);
 // Visit every field (key, current value, allowed range), e.g. for JSON.
 void forEach(const Settings& s, void (*fn)(const char* key, long value, long min, long max, void* ctx),
              void* ctx);
+// Allowed range of one field. Returns false for an unknown key.
+bool range(const char* key, long* min, long* max);
 // One "key = value  (min-max)" line per field, for the serial console.
 void describe(const Settings& s, void (*line)(const char*));
 

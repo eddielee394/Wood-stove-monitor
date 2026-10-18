@@ -274,6 +274,9 @@ Original spec:
 ### Web page (on the device)
 - Live temperatures, rates, alarm state, and settings, reachable from any phone on
   the LAN. Works without Home Assistant.
+- **Frozen since v0.9.0:** don't extend it; new settings and controls go into
+  Home Assistant (see below). It remains a fallback and the place to enter
+  the MQTT broker.
 
 ### Outside temperature (added after Phase 5)
 Display-only, never used by alarms. `src/weather.cpp` fetches current
@@ -290,12 +293,32 @@ gear): weather icon + "28°F" only (Eddie: no "outside" text), hidden if the
 status chips need the room. Quiet mode is a crossed-out bell with no text;
 moon/sun icons are reserved for weather and time.
 
-### Home Assistant (later phase)
-- Eddie does not run Home Assistant yet. Build MQTT support so it can be switched on
-  later by setting a broker address.
-- Use MQTT discovery (`homeassistant/...` config topics) for: both temperatures, both
-  rates, alarm states, probe faults, Wi-Fi RSSI, and threshold number entities.
-- Settings edited in HA flow through the same validated setter as the touchscreen.
+### Home Assistant (Phase 6, v0.9.0)
+**Home Assistant is the primary hub and control surface (Eddie, 2026-10-17).**
+Every setting the monitor has is exposed in HA. **Any new or changed setting
+or configuration goes into the HA integration as part of the same change:**
+add it to `SETTINGS` in `src/mqtt.cpp` (switch for 0/1, number otherwise) and
+to the dashboard/automation YAML in `docs/home-assistant.md`. **Do not add
+features to the device web page any more.** It stays as a LAN fallback and as
+the one place to enter the MQTT broker, which has to be set before HA can
+reach the monitor. The touchscreen keeps working on its own (safety and Wi-Fi
+setup must not depend on HA).
+- HA Green at 192.168.1.118 runs the Mosquitto add-on. The monitor logs in
+  with a broker login (`stove-monitor`) defined in the add-on's Logins
+  list, not an HA user. Port 1883, plain MQTT on the LAN.
+- `src/mqtt.cpp`: PubSubClient in its own priority-1 task on core 0.
+  Reconnects with backoff from 5s, doubling to 60s. Broker host, port, user
+  and password are entered on the web page (`POST /api/mqtt`) and stored only
+  in NVS namespace `mqtt`. The password is never logged or served back.
+- Topics: availability `stove-monitor/status` (LWT `offline`, retained);
+  state JSON `stove-monitor/state`, sent every 10s and at once when an alarm
+  or setting changes; commands `stove-monitor/set/<settings key>` (`ON`/`OFF`
+  or a number) and `stove-monitor/silence` (`PRESS`). Discovery is sent
+  retained to `homeassistant/<component>/stove_monitor_<mac>/<key>/config` on
+  connect and again when HA publishes `online` on `homeassistant/status`.
+- Commands go through `settings::setByName`, the same validated setter as the
+  touchscreen. A rejected value snaps HA back to the real value and shows in
+  the "Last rejected setting" diagnostic sensor.
 
 ---
 
@@ -368,7 +391,8 @@ on-screen keyboard. Credentials are stored in NVS on the device (this replaces
 icon to the dashboard top bar.
 
 **Phase 6 — Home Assistant MQTT discovery**
-Only when Eddie has HA and the Mosquitto broker running.
+Started 2026-10-17 (HA Green + Mosquitto running). See "Home Assistant" in
+section 6: HA is now the primary control surface.
 
 **Phase 7 — UI v2 and history**
 Graphs, reload tracking, night dimming, optional SD logging.

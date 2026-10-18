@@ -4,6 +4,7 @@
 #include <esp_heap_caps.h>
 
 #include "buzzer.h"
+#include "mqtt.h"
 #include "ota.h"
 #include "settings.h"
 #include "state.h"
@@ -93,6 +94,10 @@ void run(char* line) {
     Serial.printf("located=%d valid=%d temp=%.1fF sky=%s day=%d age=%lus sunrise=%s sunset=%s error=%s\n",
                   w.located, w.valid, w.tempF, weather::skyName(w.sky), w.isDay,
                   (unsigned long)w.ageS, w.sunrise, w.sunset, w.error);
+  } else if (!strcmp(cmd, "mqtt")) {
+    mqtt::Status m = mqtt::status();
+    Serial.printf("mqtt %s broker=%s:%u user=%s password=%s error=%s\n", mqtt::connName(m.conn),
+                  m.host, m.port, m.user, m.hasPass ? "set" : "none", m.error);
   } else if (!strcmp(cmd, "mem")) {
     Serial.printf("heap: internal free %u (min %u, largest %u), psram free %u\n",
                   heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
@@ -105,7 +110,7 @@ void run(char* line) {
     state::requestSilence();
     println("ok: silence requested");
   } else {
-    println("commands: show | settings | set <key> <value> | defaults | silence | bench on|off | weather | location");
+    println("commands: show | settings | set <key> <value> | defaults | silence | bench on|off | weather | location | mqtt");
   }
 }
 

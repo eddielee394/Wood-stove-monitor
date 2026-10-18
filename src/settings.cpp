@@ -157,6 +157,17 @@ void forEach(const Settings& s, void (*fn)(const char*, long, long, long, void*)
   for (const Field& f : FIELDS) fn(f.key, s.*f.member, f.min, f.max, ctx);
 }
 
+bool range(const char* key, long* min, long* max) {
+  for (const Field& f : FIELDS) {
+    if (strcmp(key, f.key) == 0) {
+      *min = f.min;
+      *max = f.max;
+      return true;
+    }
+  }
+  return false;
+}
+
 void describe(const Settings& s, void (*line)(const char*)) {
   char buf[64];
   for (const Field& f : FIELDS) {

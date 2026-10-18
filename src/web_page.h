@@ -55,7 +55,7 @@ label{display:flex;justify-content:space-between;align-items:center;gap:12px;pad
 input[type=number]{width:110px;font:inherit;padding:10px;border-radius:8px;border:1px solid #2E3D4F;background:#17212C;color:var(--text);text-align:right}
 input[type=checkbox]{width:24px;height:24px}
 .save{background:var(--accent);color:#fff;margin:8px 0 16px}
-#msg,#locmsg{font-size:14px;margin-left:8px}
+#msg,#locmsg,#mqmsg{font-size:14px;margin-left:8px}
 .err{color:var(--amber)}.ok{color:var(--green)}
 .outside{color:var(--muted);font-size:15px;margin:-4px 0 12px}
 .hint{color:var(--subtle);font-size:13px;margin:4px 0 8px}
@@ -110,6 +110,16 @@ footer{color:var(--subtle);font-size:13px;margin-top:16px}
 <input class="loc" type="text" name="coords" autocomplete="off" placeholder="e.g. 41.87811, -87.62980"></fieldset>
 <button class="save" type="submit">Save location</button><span id="locmsg"></span>
 </form>
+<form id="mq">
+<fieldset><legend>HOME ASSISTANT (MQTT BROKER)</legend>
+<p class="hint">The Mosquitto add-on on Home Assistant. Use its IP address. Leave the address empty to turn MQTT off. The password is stored only on the monitor and never shown again.</p>
+<p class="hint" id="mqstate"></p>
+<label>Broker address <input class="loc" style="width:180px" type="text" name="host" autocomplete="off" placeholder="192.168.1.x"></label>
+<label>Port <input type="number" name="port" placeholder="1883"></label>
+<label>Username <input class="loc" style="width:180px" type="text" name="user" autocomplete="off"></label>
+<label>Password <input class="loc" style="width:180px" type="password" name="pass" autocomplete="new-password"></label></fieldset>
+<button class="save" type="submit">Save broker</button><span id="mqmsg"></span>
+</form>
 </details>
 <footer id="foot"></footer>
 </main>
@@ -154,7 +164,13 @@ function outside(o){
   if(o.sunrise&&o.sunset)t+=' · sunrise '+h12(o.sunrise)+', sunset '+h12(o.sunset);
   el.textContent=t;
 }
-let locLoaded=false;
+let locLoaded=false,mqLoaded=false;
+function mqttState(m){
+  let t=m.state==='off'?'MQTT is off':m.state==='connected'?'Connected to '+m.host:m.state==='failed'?'Not connected: '+m.error+(m.retry_in?' · retrying in '+m.retry_in+'s':''):'MQTT '+m.state;
+  $('mqstate').textContent=t;$('mqstate').className='hint'+(m.state==='failed'?' err':m.state==='connected'?' ok':'');
+  if(!mqLoaded){const f=$('mq').elements;f.host.value=m.host;f.port.value=m.port||1883;f.user.value=m.user;
+    f.pass.placeholder=m.has_pass?'saved · leave empty to keep':'';mqLoaded=true}
+}
 let settingsLoaded=false;
 function fillSettings(g){
   for(const el of $('form').elements){if(!el.name||!(el.name in g))continue;
@@ -168,7 +184,7 @@ async function poll(){
     for(let i=0;i<2;i++)card(i,s.ch[i],s.alarms.temp[i],s.alarms.fault[i]);
     banner(s);zone(s);
     if(!settingsLoaded)fillSettings(s.settings);
-    outside(s.outside);
+    outside(s.outside);mqttState(s.mqtt);
     if(!locLoaded){if(s.outside.located)$('loc').elements.coords.value=s.outside.lat+', '+s.outside.lon;locLoaded=true}
     $('fresh').textContent='live';$('fresh').className='fresh';
     $('foot').textContent='Firmware '+s.version+' · Wi-Fi '+s.wifi.ssid+' · '+s.wifi.rssi+' dBm · up '+Math.floor(s.uptime/60)+' min';
@@ -191,6 +207,13 @@ $('loc').onsubmit=async e=>{
   const body=new URLSearchParams({lat:m?m[1]:'',lon:m?m[2]:''});
   const r=await fetch('/api/location',{method:'POST',body});const j=await r.json();
   $('locmsg').textContent=j.ok?'Saved':j.error;$('locmsg').className=j.ok?'ok':'err';poll();
+};
+$('mq').onsubmit=async e=>{
+  e.preventDefault();const f=e.target.elements;
+  const body=new URLSearchParams({host:f.host.value.trim(),port:f.port.value,user:f.user.value.trim(),pass:f.pass.value});
+  const r=await fetch('/api/mqtt',{method:'POST',body});const j=await r.json();
+  f.pass.value='';mqLoaded=false;
+  $('mqmsg').textContent=j.ok?'Saved':j.error;$('mqmsg').className=j.ok?'ok':'err';poll();
 };
 poll();setInterval(poll,2000);
 </script>

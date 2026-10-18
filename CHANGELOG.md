@@ -11,6 +11,18 @@ Each release on GitHub has two files:
 - `stove-monitor-vX.Y.Z-full.bin`: USB recovery image, flashed at 0x0. It
   erases settings, Wi-Fi and the OTA password.
 
+## v0.9.0
+
+- Home Assistant over MQTT. The monitor shows up as a **Stove Monitor**
+  device: temperatures, rates, outside temperature, alarm states, probe
+  faults, a Silence button, and **every setting** as a switch or number.
+  Changes from HA are validated like the touchscreen's.
+- The broker (address, port, login) is entered on the web page and stored only
+  on the monitor. MQTT stays off until it's set, and alarms never depend on it.
+- `docs/home-assistant.md`: phone notifications (chimney fire, critical, probe
+  fault, offline, warning, reload, Silence from the notification) and a
+  dashboard card.
+
 ## v0.8.0 - 2026-10-17
 
 - **Flip screen:** a new Settings → Screen tab, also on the web page, turns

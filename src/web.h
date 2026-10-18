@@ -4,6 +4,7 @@
 //   POST /api/settings  form-encoded key=value pairs, applied atomically
 //   POST /api/silence   same as tapping Silence on the screen
 //   POST /api/location  lat=..&lon=.. for the outside temperature (empty clears)
+//   POST /api/mqtt      host, port, user, pass for Home Assistant (empty host = off)
 #pragma once
 
 namespace web {
