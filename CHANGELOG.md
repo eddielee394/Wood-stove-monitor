@@ -19,9 +19,16 @@ Each release on GitHub has two files:
   Changes from HA are validated like the touchscreen's.
 - The broker (address, port, login) is entered on the web page and stored only
   on the monitor. MQTT stays off until it's set, and alarms never depend on it.
-- `docs/home-assistant.md`: phone notifications (chimney fire, critical, probe
-  fault, offline, warning, reload, Silence from the notification) and a
-  dashboard card.
+- **Burn zone** sensor (Too cool, Ideal burn, Running hot, Chimney too cool),
+  decided the same way as on the touchscreen.
+- `docs/ha-dashboard.yaml`: the Stove dashboard (gauges, burn zone, alarm
+  banner, quick controls, every setting, history). `docs/home-assistant.md`:
+  setup and phone notifications (chimney fire, critical, probe fault,
+  offline, warning, reload, Silence from the notification).
+- Memory: the boot-time weather fetch and the MQTT connect take turns, so a
+  restart with the broker running no longer exhausts RAM and drops Wi-Fi.
+  If internal RAM ever stays nearly exhausted for a minute, the monitor
+  restarts itself and reports "low memory restart".
 
 ## v0.8.0 - 2026-10-17
 
