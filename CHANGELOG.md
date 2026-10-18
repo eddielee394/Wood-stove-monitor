@@ -11,6 +11,16 @@ Each release on GitHub has two files:
 - `stove-monitor-vX.Y.Z-full.bin`: USB recovery image, flashed at 0x0. It
   erases settings, Wi-Fi and the OTA password.
 
+## v0.8.0 - 2026-10-17
+
+- **Flip screen:** a new Settings → Screen tab, also on the web page, turns
+  the display 180° so the unit can be mounted with its cable on the other
+  side. Touch flips with it. Brightness moved to this tab too.
+- **Steadier rate of change:** the °F/min figure is now the slope of a
+  straight line fitted through the last 60 seconds of readings, instead of
+  newest minus oldest. A single jumpy reading no longer throws it off. The
+  chimney-fire rate alarm uses the same, steadier figure.
+
 ## v0.7.0 - 2026-10-16
 
 - **Reload temperature on the touchscreen:** Settings → Alerts has a new

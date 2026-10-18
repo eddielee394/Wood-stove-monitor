@@ -32,6 +32,7 @@ const Field FIELDS[] = {
     {"quiet", &Settings::quiet, 0, 1},
     {"units_c", &Settings::unitsC, 0, 1},
     {"brightness", &Settings::brightness, 10, 255},
+    {"flip", &Settings::flip, 0, 1},
 };
 
 const char* NVS_NS = "settings";
@@ -92,6 +93,7 @@ Settings defaults() {
   s.quiet = 0;
   s.unitsC = 0;
   s.brightness = 200;
+  s.flip = 0;
   return s;
 }
 

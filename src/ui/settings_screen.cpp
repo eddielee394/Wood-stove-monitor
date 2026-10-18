@@ -12,7 +12,7 @@ namespace {
 
 const int STEP_F = 25;
 
-enum Tab { STOVE_TAB, FLUE_TAB, ALERTS_TAB, WIFI_TAB, TAB_COUNT };
+enum Tab { STOVE_TAB, FLUE_TAB, ALERTS_TAB, SCREEN_TAB, WIFI_TAB, TAB_COUNT };
 
 struct Toggle {
   lv_obj_t* state;
@@ -32,7 +32,8 @@ struct {
   lv_obj_t* note;
   lv_obj_t* alerts;
   lv_obj_t* reloadValue;
-  Toggle reload, quiet;
+  Toggle reload, quiet, flip;
+  lv_obj_t* screenTab;
   lv_obj_t* brightFill;
   lv_obj_t* brightValue;
   void (*onBack)();
@@ -134,6 +135,7 @@ void selectTab(Tab t) {
   }
   show(ui.limits, t == STOVE_TAB || t == FLUE_TAB);
   show(ui.alerts, t == ALERTS_TAB);
+  show(ui.screenTab, t == SCREEN_TAB);
   show(ui.wifi, t == WIFI_TAB);
   // Opening the Wi-Fi tab scans straight away if there's nothing listed yet.
   if (t == WIFI_TAB && !net::scanning() && net::scanResults().empty()) net::requestScan();
@@ -156,7 +158,7 @@ void buildHeader(lv_obj_t* scr) {
   lv_obj_center(icon(back, &icon_back_24, MUTED));
   lv_obj_add_event_cb(back, [](lv_event_t*) { if (ui.onBack) ui.onBack(); }, LV_EVENT_CLICKED, nullptr);
 
-  const char* names[TAB_COUNT] = {"Stove", "Flue", "Alerts", "Wi-Fi"};
+  const char* names[TAB_COUNT] = {"Stove", "Flue", "Alerts", "Screen", "Wi-Fi"};
   const int tabW = (480 - 56) / TAB_COUNT;
   for (int i = 0; i < TAB_COUNT; i++) {
     lv_obj_t* b = box(head);
@@ -223,13 +225,12 @@ void buildAlerts(lv_obj_t* scr) {
   lv_obj_set_size(ui.alerts, 448, 272);
   lv_obj_set_flex_flow(ui.alerts, LV_FLEX_FLOW_COLUMN);
 
-  // Four rows share the 272px panel: 64 + 64 + 64 + 80.
-  ui.reload = toggleRow(ui.alerts, 64, "Reload alert", "Double beep when the stove cools", [](lv_event_t*) {
+  ui.reload = toggleRow(ui.alerts, 88, "Reload alert", "Double beep when the stove cools", [](lv_event_t*) {
     change([](settings::Settings& s) { s.reloadOn = !s.reloadOn; });
   });
 
   // Reload temperature; must stay below the STOVE warning (the setter checks).
-  lv_obj_t* rl = settingRow(ui.alerts, 64, true);
+  lv_obj_t* rl = settingRow(ui.alerts, 88, true);
   lv_obj_align(titled(rl, "Reload below", "Stove temperature · steps of 25°F"), LV_ALIGN_LEFT_MID, 0, 0);
   lv_obj_t* rs = stepper(
       rl, &ui.reloadValue,
@@ -241,11 +242,22 @@ void buildAlerts(lv_obj_t* scr) {
       });
   lv_obj_align(rs, LV_ALIGN_RIGHT_MID, 0, 0);
 
-  ui.quiet = toggleRow(ui.alerts, 64, "Quiet mode", "Critical alarms always sound", [](lv_event_t*) {
+  ui.quiet = toggleRow(ui.alerts, 88, "Quiet mode", "Critical alarms always sound", [](lv_event_t*) {
     change([](settings::Settings& s) { s.quiet = !s.quiet; });
   });
+}
 
-  lv_obj_t* b = settingRow(ui.alerts, 80, false);
+void buildScreenTab(lv_obj_t* scr) {
+  ui.screenTab = box(scr);
+  lv_obj_set_pos(ui.screenTab, 16, 48);
+  lv_obj_set_size(ui.screenTab, 448, 272);
+  lv_obj_set_flex_flow(ui.screenTab, LV_FLEX_FLOW_COLUMN);
+
+  ui.flip = toggleRow(ui.screenTab, 88, "Flip screen", "Turn 180° for an upside-down mount", [](lv_event_t*) {
+    change([](settings::Settings& s) { s.flip = !s.flip; });
+  });
+
+  lv_obj_t* b = settingRow(ui.screenTab, 96, false);
   lv_obj_t* t = label(b, &jakarta_20_xb, TEXT, "Brightness");
   lv_obj_align(t, LV_ALIGN_LEFT_MID, 0, 0);
   lv_obj_t* r = row(b, 12);
@@ -287,6 +299,7 @@ lv_obj_t* create(void (*onBack)(), void (*openPassword)(), void (*closePassword)
   buildHeader(ui.screen);
   buildLimits(ui.screen);
   buildAlerts(ui.screen);
+  buildScreenTab(ui.screen);
   ui.wifi = wifi_setup::buildTab(ui.screen, openPassword, closePassword);
   selectTab(STOVE_TAB);
   return ui.screen;
@@ -304,6 +317,7 @@ void update(const settings::Settings& cfg) {
   lv_obj_set_style_text_color(ui.reloadValue, c(cfg.reloadOn ? TEXT : MUTED), 0);
   setToggle(ui.reload, cfg.reloadOn, "On");
   setToggle(ui.quiet, cfg.quiet, "Quiet");
+  setToggle(ui.flip, cfg.flip, "On");
 
   int pct = (cfg.brightness * 100 + 127) / 255;
   lv_obj_set_width(ui.brightFill, 104 * pct / 100);

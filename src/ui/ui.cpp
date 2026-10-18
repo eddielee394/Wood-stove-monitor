@@ -30,6 +30,7 @@ bool passwordOpen = false;
 uint32_t lastTouchMs = 0;
 const uint32_t SETTINGS_IDLE_MS = 60000;  // back to the dashboard when idle
 int brightness = -1;
+int flipped = -1;
 
 void flush(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
   // Swap to the panel's byte order here and send the pixels untouched, so
@@ -81,6 +82,13 @@ void refresh() {
   state::Snapshot s = state::get();
   settings::Settings cfg = settings::get();
   if (cfg.brightness != brightness) tft.setBrightness(brightness = cfg.brightness);
+  if (cfg.flip != flipped) {
+    // Landscape either way up: rotation 1 normal, 3 turned 180°. LovyanGFX
+    // rotates touch to match; redraw everything in the new orientation.
+    tft.setRotation((flipped = cfg.flip) ? 3 : 1);
+    lv_obj_invalidate(lv_screen_active());
+    lv_obj_invalidate(lv_layer_top());
+  }
   // Pick the screen: an unsilenced temperature alarm takes over the whole
   // display; everything else (faults, reload, silenced alarms) stays on the
   // dashboard with its own strip, banner or chip.

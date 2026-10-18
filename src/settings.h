@@ -28,6 +28,7 @@ struct Settings {
   int32_t quiet;        // 0/1: mute Warning and Reload (never Critical/Fault)
   int32_t unitsC;       // 0 = deg F, 1 = deg C
   int32_t brightness;   // backlight 0-255
+  int32_t flip;         // 0/1: turn the display 180° for an upside-down mount
 };
 
 Settings defaults();

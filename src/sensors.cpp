@@ -35,13 +35,29 @@ struct Track {
     if (count < HISTORY) count++;
   }
 
+  // Least-squares slope through every reading in the window, in deg F per
+  // minute. Unlike newest-minus-oldest, one noisy reading at either end of
+  // the window barely moves it.
   float rate() const {
     if (count < 2) return NAN;
     int newest = (head + HISTORY - 1) % HISTORY;
     int oldest = (head + HISTORY - count) % HISTORY;
     uint32_t span = times[newest] - times[oldest];
     if (span < MIN_RATE_SPAN_MS) return NAN;
-    return (temps[newest] - temps[oldest]) * 60000.0f / span;
+    float sumT = 0, sumF = 0;
+    for (int k = 0; k < count; k++) {
+      int i = (oldest + k) % HISTORY;
+      sumT += (times[i] - times[oldest]) / 1000.0f;  // seconds since the oldest
+      sumF += temps[i];
+    }
+    float meanT = sumT / count, meanF = sumF / count, num = 0, den = 0;
+    for (int k = 0; k < count; k++) {
+      int i = (oldest + k) % HISTORY;
+      float dt = (times[i] - times[oldest]) / 1000.0f - meanT;
+      num += dt * (temps[i] - meanF);
+      den += dt * dt;
+    }
+    return den > 0 ? num / den * 60.0f : NAN;
   }
 };
 

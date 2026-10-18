@@ -181,7 +181,8 @@ datasheet.
 Single device. Suggested FreeRTOS structure:
 
 1. **Sensor task** (highest priority): reads both MAX31856s every ~1s, applies light
-   smoothing, computes rate of change (°/min over a rolling window), records faults.
+   smoothing, computes rate of change (°/min: least-squares slope over the last
+   60s of readings, since v0.8.0), records faults.
 2. **Alarm task** (high priority, same core as sensors or its own): evaluates
    thresholds and faults, drives the buzzer. Owns all safety decisions.
 3. **UI task**: LVGL refresh and touch handling. Reads a shared, mutex-protected

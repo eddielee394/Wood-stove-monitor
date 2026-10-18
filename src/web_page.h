@@ -100,7 +100,8 @@ footer{color:var(--subtle);font-size:13px;margin-top:16px}
 <label>Chimney exit at least <input type="number" name="ideal_exit" step="25"></label></fieldset>
 <fieldset><legend>DISPLAY</legend>
 <label>Show °C <input type="checkbox" name="units_c"></label>
-<label>Brightness (10–255) <input type="number" name="brightness"></label></fieldset>
+<label>Brightness (10–255) <input type="number" name="brightness"></label>
+<label>Flip screen (upside-down mount) <input type="checkbox" name="flip"></label></fieldset>
 <button class="save" type="submit">Save</button><span id="msg"></span>
 </form>
 <form id="loc">
