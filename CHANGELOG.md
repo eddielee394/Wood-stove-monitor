@@ -11,7 +11,7 @@ Each release on GitHub has two files:
 - `stove-monitor-vX.Y.Z-full.bin`: USB recovery image, flashed at 0x0. It
   erases settings, Wi-Fi and the OTA password.
 
-## v0.9.1 (unreleased)
+## v0.9.1
 
 - Fix: the monitor could stay on Wi-Fi but stop answering anything (web
   page, Home Assistant), until it was power-cycled. The weather fetch's
