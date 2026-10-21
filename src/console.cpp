@@ -5,6 +5,7 @@
 
 #include "buzzer.h"
 #include "mqtt.h"
+#include "net.h"
 #include "ota.h"
 #include "settings.h"
 #include "state.h"
@@ -104,6 +105,7 @@ void run(char* line) {
                   heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
                   heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
                   heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    Serial.printf("router silent for %lus\n", (unsigned long)(net::stuckMs() / 1000));
   } else if (!strcmp(cmd, "buzzer")) {
     buzzer::debug();
   } else if (!strcmp(cmd, "silence")) {

@@ -316,14 +316,24 @@ setup must not depend on HA).
   or a number) and `stove-monitor/silence` (`PRESS`). Discovery is sent
   retained to `homeassistant/<component>/stove_monitor_<mac>/<key>/config` on
   connect and again when HA publishes `online` on `homeassistant/status`.
-- Memory: internal RAM is tight (~56 KB free in normal running, as low as
-  ~13 KB during the boot-time weather TLS fetch). The weather fetch and the
+- Memory: internal RAM is tight (~56 KB free in normal running). The
+  prebuilt core puts mbedTLS in internal RAM (`CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC`),
+  so a weather HTTPS fetch took free internal RAM down to 2 KB and could
+  leave Wi-Fi joined but dead (2026-10-21). Since v0.9.1 `main.cpp` points
+  mbedTLS at PSRAM with `mbedtls_platform_set_calloc_free`; boot low point
+  is now ~48 KB. The weather fetch and the
   MQTT connect/discovery burst take turns under `net::heavyBegin/End`. MQTT
   waits for 20s uptime and 40 KB free before connecting, and discovery is
   paced 25ms per config. Without that, a reboot with the broker up exhausted
   RAM and killed Wi-Fi for good (2026-10-17). State messages are capped at
   1/s. `main.cpp` restarts the board if internal RAM stays under 8 KB for 60s
   (reset reason "low memory restart").
+- Wi-Fi watchdog (v0.9.1): `net.cpp` pings the router every 30s. If Wi-Fi
+  says connected but the router has been silent for 3 min, it reconnects
+  (twice at most); after 10 min `main.cpp` restarts the board ("network
+  stuck restart"). It only arms once the router has answered a ping, so a
+  router that ignores pings never triggers it. Console `mem` shows
+  "router silent for Ns".
 - Commands go through `settings::setByName`, the same validated setter as the
   touchscreen. A rejected value snaps HA back to the real value and shows in
   the "Last rejected setting" diagnostic sensor.

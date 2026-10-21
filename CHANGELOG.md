@@ -11,6 +11,17 @@ Each release on GitHub has two files:
 - `stove-monitor-vX.Y.Z-full.bin`: USB recovery image, flashed at 0x0. It
   erases settings, Wi-Fi and the OTA password.
 
+## v0.9.1 (unreleased)
+
+- Fix: the monitor could stay on Wi-Fi but stop answering anything (web
+  page, Home Assistant), until it was power-cycled. The weather fetch's
+  HTTPS took internal RAM down to 2 KB. HTTPS now uses PSRAM; the lowest
+  point at boot is now ~48 KB.
+- Wi-Fi watchdog: the monitor pings the router every 30s. If the router
+  stops answering while Wi-Fi still says connected, it reconnects, and
+  after 10 min restarts itself (shown as "network stuck restart").
+- Console `mem` shows how long the router has been silent.
+
 ## v0.9.0
 
 - Home Assistant over MQTT. The monitor shows up as a **Stove Monitor**

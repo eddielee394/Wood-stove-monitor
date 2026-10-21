@@ -38,6 +38,11 @@ std::vector<Network> scanResults();  // strongest first, duplicates merged
 void connect(const char* ssid, const char* password);  // saves on success path
 void forget();                                         // clears credentials
 
+// How long Wi-Fi has claimed to be connected while the router hasn't
+// answered a ping; 0 when fine, disconnected, or the router never answers
+// pings. main.cpp restarts the board if this gets long.
+uint32_t stuckMs();
+
 // Memory-heavy network work (the weather TLS fetch, the MQTT connect and
 // discovery burst) takes turns under this lock: run together at boot they
 // exhausted internal RAM and took Wi-Fi down. Blocks until free.

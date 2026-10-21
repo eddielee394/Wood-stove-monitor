@@ -16,12 +16,13 @@ std::atomic<bool> silenceRequested{false};
 std::atomic<bool> benchMute{false};
 RTC_NOINIT_ATTR uint32_t restartMark;  // survives a software restart
 const uint32_t LOW_MEM_MARK = 0x4C4F4D45;  // "LOME"
-bool lowMemBoot = false;
+const uint32_t NET_STUCK_MARK = 0x4E455453;  // "NETS"
+uint32_t bootMark = 0;
 
 }  // namespace
 
 void begin() {
-  lowMemBoot = esp_reset_reason() == ESP_RST_SW && restartMark == LOW_MEM_MARK;
+  if (esp_reset_reason() == ESP_RST_SW) bootMark = restartMark;
   restartMark = 0;
   lock = xSemaphoreCreateMutex();
   snap = {};
@@ -59,8 +60,14 @@ void restartLowMemory() {
   esp_restart();
 }
 
+void restartNetworkStuck() {
+  restartMark = NET_STUCK_MARK;
+  esp_restart();
+}
+
 const char* resetReason() {
-  if (lowMemBoot) return "low memory restart";
+  if (bootMark == LOW_MEM_MARK) return "low memory restart";
+  if (bootMark == NET_STUCK_MARK) return "network stuck restart";
   switch (esp_reset_reason()) {
     case ESP_RST_POWERON: return "power on";
     case ESP_RST_SW: return "software restart";

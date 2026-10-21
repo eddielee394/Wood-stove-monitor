@@ -3,8 +3,11 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <freertos/semphr.h>
+#include <lwip/ip_addr.h>
+#include <ping/ping_sock.h>
 
 #include <algorithm>
+#include <atomic>
 
 #include "web.h"
 
@@ -15,6 +18,12 @@ const char* NVS_NS = "wifi";
 const char* HOSTNAME = "stove-monitor";
 const uint32_t CONNECT_TIMEOUT_MS = 20000;
 const uint32_t BACKOFF_MIN_MS = 5000, BACKOFF_MAX_MS = 60000;
+// Wi-Fi can stay "connected" while no traffic gets through (seen after
+// internal RAM ran out, 2026-10-21). Ping the router; if it stops answering,
+// reconnect, and after a couple of tries let main.cpp restart the board.
+const uint32_t PING_EVERY_MS = 30000;
+const uint32_t STUCK_RECONNECT_MS = 180000;
+const int STUCK_RECONNECTS = 2;
 
 SemaphoreHandle_t lock;
 SemaphoreHandle_t heavy;
@@ -27,6 +36,48 @@ bool connectRequested = false, forgetRequested = false;
 String reqSsid, reqPass;
 
 String ssid, pass;  // task-owned copy of the saved credentials
+
+esp_ping_handle_t pinger = nullptr;
+uint32_t pingTarget = 0;
+std::atomic<bool> gatewayAnswers{false};  // only watch a router that answers pings
+std::atomic<uint32_t> lastReply{0};
+
+// Time since the router last answered (or since `since`, if later). A reply
+// can land after `now` was read; treat that as 0, not a wrapped huge gap.
+uint32_t silentFor(uint32_t now, uint32_t since = 0) {
+  int32_t d = (int32_t)(now - std::max<uint32_t>(lastReply, since));
+  return d > 0 ? d : 0;
+}
+
+void onPingReply(esp_ping_handle_t, void*) {
+  lastReply = millis();
+  gatewayAnswers = true;
+}
+
+// One ping every 30s to the router, for as long as the board runs.
+void startPinger() {
+  IPAddress gw = WiFi.gatewayIP();
+  uint32_t target = gw;
+  if (!target || target == pingTarget) return;
+  if (pinger) {
+    esp_ping_stop(pinger);
+    esp_ping_delete_session(pinger);
+    pinger = nullptr;
+  }
+  esp_ping_config_t cfg = ESP_PING_DEFAULT_CONFIG();
+  IP_ADDR4(&cfg.target_addr, gw[0], gw[1], gw[2], gw[3]);
+  cfg.count = ESP_PING_COUNT_INFINITE;
+  cfg.interval_ms = PING_EVERY_MS;
+  cfg.timeout_ms = 2000;
+  esp_ping_callbacks_t cbs = {};
+  cbs.on_ping_success = onPingReply;
+  if (esp_ping_new_session(&cfg, &cbs, &pinger) == ESP_OK) {
+    esp_ping_start(pinger);
+    pingTarget = target;
+  } else {
+    pinger = nullptr;
+  }
+}
 
 void setLink(Link l) {
   xSemaphoreTake(lock, portMAX_DELAY);
@@ -101,7 +152,9 @@ void task(void*) {
   WiFi.setAutoReconnect(false);
 
   loadCredentials();
-  uint32_t backoff = BACKOFF_MIN_MS, attemptAt = 0, nextTry = 0;
+  uint32_t backoff = BACKOFF_MIN_MS, attemptAt = 0, nextTry = 0, connectedAt = 0;
+  uint32_t seenReply = 0;
+  int stuckReconnects = 0;
   bool wasConnected = false;
   if (ssid.length()) {
     beginConnect();
@@ -158,6 +211,16 @@ void task(void*) {
                       WiFi.RSSI());
         web::begin();  // idempotent; keeps serving across reconnects
         configTime(0, 0, "pool.ntp.org", "time.google.com");  // UTC clock, for TLS dates
+        startPinger();
+        connectedAt = now;
+      } else if (up && link == Link::Connected && gatewayAnswers &&
+                 silentFor(now, connectedAt) > STUCK_RECONNECT_MS &&
+                 stuckReconnects < STUCK_RECONNECTS) {
+        Serial.println("net: router stopped answering, reconnecting Wi-Fi");
+        stuckReconnects++;
+        WiFi.disconnect(false, false);
+        setLink(Link::Disconnected);
+        nextTry = now + 1000;
       } else if (!up && link == Link::Connected) {
         Serial.println("net: connection lost");
         setLink(Link::Disconnected);
@@ -174,6 +237,11 @@ void task(void*) {
       }
     }
 
+    if (lastReply != seenReply) {
+      seenReply = lastReply;
+      stuckReconnects = 0;
+    }
+
     xSemaphoreTake(lock, portMAX_DELAY);
     st.retryInS = st.link == Link::Disconnected && (int32_t)(nextTry - now) > 0
                       ? (nextTry - now) / 1000 + 1 : 0;
@@ -185,6 +253,11 @@ void task(void*) {
 }
 
 }  // namespace
+
+uint32_t stuckMs() {
+  if (!gatewayAnswers || status().link != Link::Connected) return 0;
+  return silentFor(millis());
+}
 
 void heavyBegin() { xSemaphoreTake(heavy, portMAX_DELAY); }
 void heavyEnd() { xSemaphoreGive(heavy); }

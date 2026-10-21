@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <esp_heap_caps.h>
 #include <esp_task_wdt.h>
+#include <mbedtls/platform.h>
 
 #include "alarms.h"
 #include "buzzer.h"
@@ -24,6 +25,7 @@ LGFX tft;
 static const uint32_t WDT_TIMEOUT_S = 10;
 static const size_t LOW_HEAP = 8000;            // internal RAM bytes
 static const uint32_t LOW_HEAP_RESTART_MS = 60000;
+static const uint32_t NET_STUCK_RESTART_MS = 600000;  // net.cpp reconnects twice first
 
 // If internal RAM stays nearly exhausted, Wi-Fi can stop working for good
 // while everything else runs on. Restart (a few seconds; the alarms come
@@ -40,6 +42,23 @@ static void memoryGuard() {
   }
 }
 
+// HTTPS (the weather fetch) needs ~40 KB while it runs. The prebuilt core
+// puts it all in internal RAM, which took free internal RAM down to 2 KB and
+// could leave Wi-Fi dead. PSRAM has 2 MB spare; use it, internal as fallback.
+static void* tlsCalloc(size_t n, size_t size) {
+  void* p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM);
+  return p ? p : heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+
+// Wi-Fi joined but the router silent for 10 min, even after net.cpp
+// reconnected: restart, like memoryGuard.
+static void networkGuard() {
+  if (net::stuckMs() > NET_STUCK_RESTART_MS) {
+    Serial.println("net: router unreachable for 10 min, restarting");
+    state::restartNetworkStuck();
+  }
+}
+
 void setup() {
   buzzer::begin();  // pin held quiet before anything else
   Serial.begin(115200);
@@ -53,6 +72,7 @@ void setup() {
   state::begin();
   sensors::start();
   alarms::start();
+  mbedtls_platform_set_calloc_free(tlsCalloc, heap_caps_free);
   net::start();  // after the safety tasks; nothing depends on it
   weather::start();
   mqtt::start();
@@ -67,5 +87,6 @@ void loop() {
   console::poll();
   ui::loop();
   memoryGuard();
+  networkGuard();
   delay(5);
 }

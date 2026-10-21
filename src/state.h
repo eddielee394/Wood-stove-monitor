@@ -59,5 +59,8 @@ const char* resetReason();  // why the board last restarted
 // Restart on purpose because internal RAM ran out (network stuck); shows
 // as "low memory restart" after the reboot.
 void restartLowMemory();
+// Restart on purpose because Wi-Fi says connected but the router stopped
+// answering, and reconnecting didn't help; shows as "network stuck restart".
+void restartNetworkStuck();
 
 }  // namespace state
