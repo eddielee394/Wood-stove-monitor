@@ -75,4 +75,29 @@ void describeFault(uint8_t fault, char* out, size_t len) {
   if (!out[0]) strlcpy(out, "OK", len);
 }
 
+uint16_t badCode(const Reading& r) {
+  if (!r.present) return BAD_NO_CHIP;
+  if (r.fault) return r.fault;
+  return isnan(r.tcC) ? BAD_NO_VALUE : 0;
+}
+
+void describeBad(uint16_t bad, char* out, size_t len) {
+  static const struct { uint16_t bits; const char* name; } KINDS[] = {
+      {BAD_NO_CHIP, "chip not answering"},
+      {BAD_NO_VALUE, "no reading"},
+      {MAX31856_FAULT_OPEN, "open circuit"},
+      {MAX31856_FAULT_OVUV, "voltage"},
+      {MAX31856_FAULT_TCRANGE | MAX31856_FAULT_TCHIGH | MAX31856_FAULT_TCLOW, "out of range"},
+      {MAX31856_FAULT_CJRANGE | MAX31856_FAULT_CJHIGH | MAX31856_FAULT_CJLOW, "board temperature"},
+  };
+  out[0] = '\0';
+  for (const auto& k : KINDS) {
+    if (bad & k.bits) {
+      if (out[0]) strlcat(out, ", ", len);
+      strlcat(out, k.name, len);
+    }
+  }
+  if (!out[0]) strlcpy(out, "none", len);
+}
+
 }  // namespace thermo

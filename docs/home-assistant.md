@@ -27,7 +27,7 @@ All entity IDs start with `stove_monitor_`.
 | Switches | Reload alert, Quiet mode, Ideal burn indicator, Screen shows °C, Flip screen |
 | Numbers | Stove / Flue warning and critical, Chimney fire rise rate, Chimney fire check above, Reload temperature, Hysteresis, Ideal stove from / to, Ideal chimney exit at least, Silence warnings for, Silence critical for, Screen brightness |
 | Button | Silence alarm |
-| Diagnostics | Wi-Fi signal, Uptime, Last restart reason, Last rejected setting |
+| Diagnostics | Wi-Fi signal, Uptime, Last restart reason, Last rejected setting, Stove/Flue probe glitches, Stove/Flue probe last glitch, Free memory, Lowest free memory, Largest free memory block |
 
 Every setting the monitor has is here. A change from HA goes through the same
 checks as the touchscreen. If the monitor rejects a value (for example a

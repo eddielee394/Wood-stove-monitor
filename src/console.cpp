@@ -24,10 +24,13 @@ void show() {
   state::Snapshot s = state::get();
   for (int i = 0; i < thermo::COUNT; i++) {
     const state::Channel& c = s.ch[i];
-    Serial.printf("%-5s temp=%.1fF rate=%.1fF/min board=%.1fF fault=%s raw=0x%02X present=%d alarm=%s%s\n",
+    char last[48];
+    thermo::describeBad(c.lastBad, last, sizeof(last));
+    Serial.printf("%-5s temp=%.1fF rate=%.1fF/min board=%.1fF fault=%s raw=0x%02X present=%d alarm=%s%s glitches=%lu last=%s\n",
                   thermo::name((thermo::Channel)i), c.tempF, c.rateFpm, c.boardF,
                   c.faulted ? "YES" : "no", c.fault, c.present,
-                  state::levelName(s.alarms.temp[i]), s.alarms.fault[i] ? " +FAULT" : "");
+                  state::levelName(s.alarms.temp[i]), s.alarms.fault[i] ? " +FAULT" : "",
+                  (unsigned long)c.glitches, last);
   }
   Serial.printf("firmware %s, last reset: %s, up %lus\n", version::get(), state::resetReason(),
                 (unsigned long)(millis() / 1000));

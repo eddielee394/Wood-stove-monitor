@@ -334,6 +334,10 @@ setup must not depend on HA).
   stuck restart"). It only arms once the router has answered a ping, so a
   router that ignores pings never triggers it. Console `mem` shows
   "router silent for Ns".
+- Diagnostics in HA (v0.9.2): per-probe glitch counters (every bad read,
+  counted in the sensor task's snapshot with no I/O) and last glitch kind,
+  plus free / lowest / largest-block internal RAM. Use these instead of a
+  USB logger to investigate probe dropouts or memory.
 - Commands go through `settings::setByName`, the same validated setter as the
   touchscreen. A rejected value snaps HA back to the real value and shows in
   the "Last rejected setting" diagnostic sensor.

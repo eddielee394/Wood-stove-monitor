@@ -11,6 +11,19 @@ Each release on GitHub has two files:
 - `stove-monitor-vX.Y.Z-full.bin`: USB recovery image, flashed at 0x0. It
   erases settings, Wi-Fi and the OTA password.
 
+## v0.9.2
+
+- Home Assistant diagnostics, so the monitor no longer needs a laptop on
+  USB to log problems:
+  - Stove/Flue probe glitches: every bad probe read since boot, including
+    one-second blips too short to show a fault on the screen.
+  - Stove/Flue probe last glitch: what the probe chip reported (open
+    circuit, voltage, out of range, board temperature, chip not answering).
+  - Free memory, lowest free memory since boot, largest free block.
+- Dashboard: these on History → Monitor health, with 48-hour graphs of
+  probe glitches and free memory.
+- Console `show` lists glitches and the last glitch per probe.
+
 ## v0.9.1
 
 - Fix: the monitor could stay on Wi-Fi but stop answering anything (web

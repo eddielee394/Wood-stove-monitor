@@ -14,6 +14,7 @@
 #include "net.h"
 #include "settings.h"
 #include "state.h"
+#include "thermo.h"
 #include "version.h"
 #include "weather.h"
 
@@ -209,6 +210,20 @@ void sensor(const char* key, const char* name, const char* path, const char* uni
   announce("sensor", key, d);
 }
 
+// Bytes of internal RAM, shown in kB.
+void memSensor(const char* key, const char* name, const char* path) {
+  JsonDocument d;
+  entity(d, key, name);
+  valueTemplate(d, path);
+  d["unit_of_measurement"] = "B";
+  d["suggested_unit_of_measurement"] = "kB";
+  d["device_class"] = "data_size";
+  d["state_class"] = "measurement";
+  d["suggested_display_precision"] = 1;
+  d["entity_category"] = "diagnostic";
+  announce("sensor", key, d);
+}
+
 void enumSensor(const char* key, const char* name, const char* path, const char* icon,
                 std::initializer_list<const char*> options) {
   JsonDocument d;
@@ -281,6 +296,19 @@ void announceAll() {
          false, true);
   sensor("rejected", "Last rejected setting", "rejected", nullptr, nullptr, "mdi:alert-circle",
          false, true);
+  // Probe glitches: every bad read, even one too short to raise a fault.
+  // The counters' history in HA shows when each one happened.
+  sensor("stove_glitches", "Stove probe glitches", "stove.glitches", nullptr, nullptr,
+         "mdi:pulse", false, true);
+  sensor("flue_glitches", "Flue probe glitches", "flue.glitches", nullptr, nullptr,
+         "mdi:pulse", false, true);
+  sensor("stove_last_bad", "Stove probe last glitch", "stove.last_bad", nullptr, nullptr,
+         "mdi:alert-circle-outline", false, true);
+  sensor("flue_last_bad", "Flue probe last glitch", "flue.last_bad", nullptr, nullptr,
+         "mdi:alert-circle-outline", false, true);
+  memSensor("mem_free", "Free memory", "mem.free");
+  memSensor("mem_min", "Lowest free memory", "mem.min");
+  memSensor("mem_block", "Largest free memory block", "mem.block");
 
   binary("chimney_fire", "Possible chimney fire", "alarm.chimney", "safety", nullptr);
   binary("stove_fault", "Stove probe fault", "alarm.stove_fault", "problem", nullptr);
@@ -309,6 +337,7 @@ void announceAll() {
 struct Sig {
   state::Level temp[thermo::COUNT];
   bool fault[thermo::COUNT];
+  uint32_t glitches[thermo::COUNT];
   bool rateHigh, reload, ideal, silenced, audible;
   state::Level highest;
   settings::Settings cfg;
@@ -322,7 +351,8 @@ bool sameSettings(const settings::Settings& a, const settings::Settings& b) {
 
 bool operator==(const Sig& a, const Sig& b) {
   for (int i = 0; i < thermo::COUNT; i++) {
-    if (a.temp[i] != b.temp[i] || a.fault[i] != b.fault[i]) return false;
+    if (a.temp[i] != b.temp[i] || a.fault[i] != b.fault[i] || a.glitches[i] != b.glitches[i])
+      return false;
   }
   return a.rateHigh == b.rateHigh && a.reload == b.reload && a.ideal == b.ideal &&
          a.silenced == b.silenced && a.audible == b.audible && a.highest == b.highest &&
@@ -331,10 +361,12 @@ bool operator==(const Sig& a, const Sig& b) {
 
 Sig signature() {
   Sig g = {};
-  state::Alarms a = state::get().alarms;
+  state::Snapshot snap = state::get();
+  const state::Alarms& a = snap.alarms;
   for (int i = 0; i < thermo::COUNT; i++) {
     g.temp[i] = a.temp[i];
     g.fault[i] = a.fault[i];
+    g.glitches[i] = snap.ch[i].glitches;
   }
   g.rateHigh = a.rateHigh;
   g.reload = a.reload;
@@ -368,6 +400,10 @@ void publishState() {
     JsonObject c = d[names[i]].to<JsonObject>();
     addNumber(c["temp"], s.ch[i].valid ? s.ch[i].tempF : NAN);
     addNumber(c["rate"], s.ch[i].valid ? s.ch[i].rateFpm : NAN, 0);  // whole °F/min, like the screen
+    c["glitches"] = s.ch[i].glitches;
+    char last[48];
+    thermo::describeBad(s.ch[i].lastBad, last, sizeof(last));
+    c["last_bad"] = last;
   }
   addNumber(d["outside"], w.valid ? w.tempF : NAN);
   d["zone"] = burnZone(s, settings::get());
@@ -393,6 +429,10 @@ void publishState() {
   d["uptime"] = millis() / 1000;
   d["reset"] = state::resetReason();
   d["rejected"] = rejected[0] ? rejected : "none";
+  JsonObject m = d["mem"].to<JsonObject>();
+  m["free"] = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  m["min"] = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+  m["block"] = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
   if (publishJson(T_STATE, d, false)) {
     xSemaphoreTake(lock, portMAX_DELAY);
     st.stateSent++;

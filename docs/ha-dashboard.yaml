@@ -431,5 +431,36 @@ views:
               - entity: sensor.stove_monitor_last_restart_reason
               - entity: sensor.stove_monitor_last_rejected_setting
               - entity: binary_sensor.stove_monitor_buzzer_sounding
+              - entity: sensor.stove_monitor_free_memory
+              - entity: sensor.stove_monitor_lowest_free_memory
+              - entity: sensor.stove_monitor_largest_free_memory_block
+              - entity: sensor.stove_monitor_stove_probe_glitches
+              - entity: sensor.stove_monitor_stove_probe_last_glitch
+              - entity: sensor.stove_monitor_flue_probe_glitches
+              - entity: sensor.stove_monitor_flue_probe_last_glitch
             grid_options:
               columns: 12
+          # Probe glitch counts: each step up is a bad read (see "last glitch"
+          # for the kind). Memory: "lowest" should stay well above 8 kB.
+          - type: history-graph
+            title: Probe glitches
+            hours_to_show: 48
+            entities:
+              - entity: sensor.stove_monitor_stove_probe_glitches
+                name: Stove
+              - entity: sensor.stove_monitor_flue_probe_glitches
+                name: Flue
+            grid_options:
+              columns: 12
+              rows: 4
+          - type: history-graph
+            title: Free memory
+            hours_to_show: 48
+            entities:
+              - entity: sensor.stove_monitor_free_memory
+                name: Free
+              - entity: sensor.stove_monitor_lowest_free_memory
+                name: Lowest since boot
+            grid_options:
+              columns: 12
+              rows: 4

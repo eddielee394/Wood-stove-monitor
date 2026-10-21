@@ -77,7 +77,12 @@ void task(void*) {
       Track& t = tracks[i];
       state::Channel& c = ch[i];
       thermo::Reading r = thermo::read((thermo::Channel)i);
-      bool good = r.present && r.fault == 0 && !isnan(r.tcC);
+      uint16_t bad = thermo::badCode(r);
+      bool good = !bad;
+      if (bad) {
+        c.glitches++;
+        c.lastBad = bad;
+      }
 
       if (good) {
         t.good++;

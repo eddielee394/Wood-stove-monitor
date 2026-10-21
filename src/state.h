@@ -19,6 +19,8 @@ struct Channel {
   float boardF;    // MAX31856 cold-junction temperature
   uint8_t fault;   // last raw fault register, 0 = OK
   bool present;    // chip answering on SPI
+  uint32_t glitches;  // bad reads since boot, including blips too short to fault
+  uint16_t lastBad;   // last bad read: fault bits | thermo::BAD_*; 0 = none yet
 };
 
 struct Alarms {
